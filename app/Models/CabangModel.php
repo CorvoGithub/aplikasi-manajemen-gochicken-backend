@@ -32,4 +32,9 @@ class CabangModel extends Model
     {
         return $this->hasMany('App\Models\KaryawanModel', 'id_cabang');
     }
+
+    public function detailPengeluaran()
+    {
+        return $this->hasMany(DetailPengeluaranModel::class, 'id_cabang');
+    }
 }

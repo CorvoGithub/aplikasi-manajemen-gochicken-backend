@@ -15,8 +15,7 @@ class PengeluaranModel extends Model
 
     protected $fillable = [
         'id_pengeluaran',
-        'id_cabang',
-        'id_jenis',
+        'id_detail_pengeluaran',
         'tanggal',
         'jumlah',
         'keterangan',
@@ -31,12 +30,6 @@ class PengeluaranModel extends Model
     // Relasi ke detail pengeluaran
     public function detailPengeluaran()
     {
-        return $this->hasMany(DetailPengeluaranModel::class, 'id_detail_pengeluaran');
-    }
-
-    // Relasi ke cabang (kalau ada model Cabang)
-    public function cabang()
-    {
-        return $this->belongsTo(CabangModel::class, 'id_cabang');
+        return $this->hasMany(DetailPengeluaranModel::class, 'id_pengeluaran', 'id_pengeluaran');
     }
 }
