@@ -32,7 +32,11 @@ Route::middleware('auth:sanctum')->group(function () {
 
         // Admin Cabang Management API
         Route::get('/cabang-without-admin', [ManageAdminCabangController::class, 'getCabangWithoutAdmin']);
-        Route::post('/create-admin-cabang', [ManageAdminCabangController::class, 'createAdminCabang']);
+
+        // Admin Cabang CRUD
+        Route::get('/admin-cabang', [ManageAdminCabangController::class, 'listAdmin']);
+        Route::post('/admin-cabang', [ManageAdminCabangController::class, 'createAdminCabang']);
+
 
         // Produk Management API
         Route::get('/produk', [ProdukController::class, 'index']);
