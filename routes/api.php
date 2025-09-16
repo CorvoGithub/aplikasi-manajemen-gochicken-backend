@@ -11,6 +11,7 @@ use App\Http\Controllers\ProdukController;
 // Public routes for authentication
 Route::post('/super-admin/login', [AuthController::class, 'loginSuperAdmin']);
 Route::post('/admin-cabang/login', [AuthController::class, 'loginAdminCabang']);
+Route::get('/cabang', [CabangController::class, 'index']);
 
 // Routes protected by Sanctum middleware
 Route::middleware('auth:sanctum')->group(function () {
@@ -24,19 +25,14 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // Routes that can only be accessed by Super Admin
     Route::middleware('role:super admin')->group(function () {
-        // Cabang Management API
-        Route::get('/cabang', [CabangController::class, 'index']);
+        // Cabang Management API  
         Route::post('/cabang', [CabangController::class, 'store']);
         Route::put('/cabang/{id_cabang}', [CabangController::class, 'update']);
         Route::delete('/cabang/{id_cabang}', [CabangController::class, 'destroy']);
 
         // Admin Cabang Management API
         Route::get('/cabang-without-admin', [ManageAdminCabangController::class, 'getCabangWithoutAdmin']);
-
-        // Admin Cabang CRUD
-        Route::get('/admin-cabang', [ManageAdminCabangController::class, 'listAdmin']);
-        Route::post('/admin-cabang', [ManageAdminCabangController::class, 'createAdminCabang']);
-
+        Route::post('/create-admin-cabang', [ManageAdminCabangController::class, 'createAdminCabang']);
 
         // Produk Management API
         Route::get('/produk', [ProdukController::class, 'index']);
