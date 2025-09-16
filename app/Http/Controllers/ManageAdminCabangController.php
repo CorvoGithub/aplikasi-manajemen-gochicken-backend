@@ -12,18 +12,17 @@ use Illuminate\Validation\ValidationException;
 class ManageAdminCabangController extends Controller
 {
     /**
-     * Tampilkan daftar cabang yang belum memiliki admin. Dan menampilkan daftar cabang yang sudah memiliki admin.
-     * Endpoint ini berguna untuk frontend Super Admin memilih cabang.
+     * Tampilkan daftar admin cabang yang ada.
      */
-    public function getCabangWithoutAdmin()
+    public function listAdmin()
     {
-        $cabang = CabangModel::whereDoesntHave('user', function ($query) {
-            $query->where('role', 'admin cabang');
-        })->get();
+        $admin = UsersModel::where('role', 'admin cabang')
+            ->with('cabang')
+            ->get();
 
         return response()->json([
             'status' => 'success',
-            'data' => $cabang,
+            'data' => $admin,
         ]);
     }
 
@@ -34,7 +33,7 @@ class ManageAdminCabangController extends Controller
     {
         // 1. Validasi data yang masuk
         $validator = Validator::make($request->all(), [
-            'id_user' => 'required',
+            // 'id_user' => 'required',
             'nama' => 'required',
             'email' => 'required',
             'password' => 'required',
@@ -50,20 +49,21 @@ class ManageAdminCabangController extends Controller
         }
 
         // 2. Pastikan cabang yang dipilih belum memiliki admin cabang
-        $cabang = CabangModel::with('user')->find($request->id_cabang);
+        // Menggunakan findOrFail untuk memastikan cabang ada
+        $cabang = CabangModel::findOrFail($request->id_cabang);
 
-        if ($cabang->user->contains('role', 'admin cabang')) {
+        if ($cabang->user()->where('role', 'admin cabang')->exists()) {
             throw ValidationException::withMessages([
                 'id_cabang' => ['Cabang ini sudah memiliki admin cabang.'],
             ]);
         }
 
-        // 3. Simpan data user baru dengan password yang di-hash
+        // 3. Simpan data user baru dengan password pribadi yang di-hash
         $user = UsersModel::create([
             'id_user' => $request->id_user,
             'nama' => $request->nama,
             'email' => $request->email,
-            'password' => Hash::make($request->password), // Hashing password
+            'password' => Hash::make($request->password),
             'role' => 'admin cabang',
             'id_cabang' => $request->id_cabang,
         ]);
@@ -72,6 +72,30 @@ class ManageAdminCabangController extends Controller
             'status' => 'success',
             'message' => 'Akun admin cabang berhasil dibuat.',
             'data' => $user,
+        ], 201); // 201 Created
+    }
+
+    public function getCabangWithoutAdmin() {
+        // Logika untuk mendapatkan cabang yang belum memiliki admin
+        $cabangWithAdmin = UsersModel::where('role', 'admin cabang')
+                                    ->pluck('id_cabang');
+
+        $cabangWithoutAdmin = CabangModel::whereNotIn('id_cabang', $cabangWithAdmin)
+                                        ->get();
+
+        return response()->json([
+            'status' => 'success',
+            'data' => $cabangWithoutAdmin,
         ]);
+    }
+
+    public function updateAdminCabang($id_user, Request $request) {
+        // isi logika update
+        return response()->json(['message' => 'Update logic for admin cabang.']);
+    }
+
+    public function deleteAdminCabang($id_user) {
+        // isi logika delete
+        return response()->json(['message' => 'Delete logic for admin cabang.']);
     }
 }

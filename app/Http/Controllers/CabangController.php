@@ -14,7 +14,7 @@ class CabangController extends Controller
      */
     public function index()
     {
-        $cabang = CabangModel::all();
+        $cabang = CabangModel::all()->toArray();
 
         return response()->json([
             'status' => 'success',

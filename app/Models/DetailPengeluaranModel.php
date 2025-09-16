@@ -14,9 +14,12 @@ class DetailPengeluaranModel extends Model
     public $incrementing = false;
 
     protected $fillable = [
+        'id_detail_pengeluaran',
         'id_pengeluaran',
-        'id_jenis',
         'id_bahan_baku',
+        'id_cabang',
+        'id_jenis_pengeluaran',
+        'id_karyawan',
         'jumlah_item',
         'harga_satuan',
         'total_harga',
@@ -34,9 +37,21 @@ class DetailPengeluaranModel extends Model
         return $this->belongsTo(JenisPengeluaranModel::class, 'id_jenis_pengeluaran');
     }
 
-    // Relasi ke bahan baku (kalau ada tabel bahan_baku)
+    // Relasi ke bahan baku
     public function bahanBaku()
     {
         return $this->belongsTo(BahanBakuModel::class, 'id_bahan_baku');
+    }
+
+    // Relasi ke cabang
+    public function cabang()
+    {
+        return $this->belongsTo(CabangModel::class, 'id_cabang');
+    }
+
+    // Relasi ke cabang
+    public function karyawan()
+    {
+        return $this->belongsTo(KaryawanModel::class, 'id_karyawan');
     }
 }

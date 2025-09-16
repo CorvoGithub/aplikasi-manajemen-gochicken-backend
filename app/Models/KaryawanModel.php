@@ -3,9 +3,12 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 
 class KaryawanModel extends Model
 {
+    use HasFactory;
+
     protected $table = 'karyawan';
     protected $primaryKey = 'id_karyawan';
     public $incrementing = false;
@@ -21,5 +24,10 @@ class KaryawanModel extends Model
     public function cabang()
     {
         return $this->belongsTo(CabangModel::class, 'id_cabang');
+    }
+
+    public function detailPengeluaran()
+    {
+        return $this->hasMany(DetailPengeluaranModel::class, 'id_karyawan');
     }
 }
