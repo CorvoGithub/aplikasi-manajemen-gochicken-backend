@@ -49,22 +49,18 @@ class AuthController extends Controller
             'password_pribadi' => 'required',
         ]);
 
-        // Cari cabang berdasarkan id_cabang
         $cabang = CabangModel::where('id_cabang', $request->id_cabang)->first();
 
-        // Cek password cabang
         if (!$cabang || !Hash::check($request->password_cabang, $cabang->password_cabang)) {
             throw ValidationException::withMessages([
                 'password_cabang' => ['Password cabang salah.'],
             ]);
         }
 
-        // Cari user (admin cabang) di dalam cabang tersebut
         $user = UsersModel::where('id_cabang', $request->id_cabang)
                             ->where('role', 'admin cabang')
                             ->first();
 
-        // Cek password pribadi (password user)
         if (!$user || !Hash::check($request->password_pribadi, $user->password)) {
             throw ValidationException::withMessages([
                 'password_pribadi' => ['Password pribadi salah.'],
@@ -75,8 +71,10 @@ class AuthController extends Controller
 
         return response()->json([
             'status' => 'success',
-            'user' => $user,
             'token' => $token,
+            'user' => $user,
+            'cabang' => $cabang, // tambahan data cabang lengkap
         ]);
     }
+
 }
