@@ -6,6 +6,7 @@ use App\Http\Controllers\AuthController;
 use App\Http\Controllers\CabangController;
 use App\Http\Controllers\KaryawanController;
 use App\Http\Controllers\ManageAdminCabangController;
+use App\Http\Controllers\PengeluaranController;
 use App\Http\Controllers\ProdukController;
 
 // Public routes for authentication
@@ -25,12 +26,13 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // Routes that can only be accessed by Super Admin
     Route::middleware('role:super admin')->group(function () {
-        // Cabang Management API  
+        // Cabang Management API
         Route::post('/cabang', [CabangController::class, 'store']);
         Route::put('/cabang/{id_cabang}', [CabangController::class, 'update']);
         Route::delete('/cabang/{id_cabang}', [CabangController::class, 'destroy']);
 
         // Admin Cabang Management API
+        Route::get('/admin-cabang', [ManageAdminCabangController::class, 'listAdmin']);
         Route::get('/cabang-without-admin', [ManageAdminCabangController::class, 'getCabangWithoutAdmin']);
         Route::post('/create-admin-cabang', [ManageAdminCabangController::class, 'createAdminCabang']);
 
@@ -45,5 +47,11 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/karyawan', [KaryawanController::class, 'store']);
         Route::put('/karyawan/{id_karyawan}', [KaryawanController::class, 'update']);
         Route::delete('/karyawan/{id_karyawan}', [KaryawanController::class, 'destroy']);
+
+        // Karyawan Management API
+        Route::get('/pengeluaran', [PengeluaranController::class, 'index']);
+        Route::post('/pengeluaran', [PengeluaranController::class, 'store']);
+        Route::put('/pengeluaran/{id_pengeluaran}', [PengeluaranController::class, 'update']);
+        Route::delete('/pengeluaran/{id_pengeluaran}', [PengeluaranController::class, 'destroy']);
     });
 });
