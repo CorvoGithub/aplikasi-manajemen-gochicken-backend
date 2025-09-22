@@ -28,7 +28,6 @@ class CabangController extends Controller
     public function store(Request $request)
     {
         $validator = Validator::make($request->all(), [
-            'id_cabang' => 'required',
             'nama_cabang' => 'required',
             'alamat' => 'required',
             'telepon' => 'required',
@@ -44,7 +43,6 @@ class CabangController extends Controller
         }
 
         $cabang = CabangModel::create([
-            'id_cabang' => $request->id_cabang,
             'nama_cabang' => $request->nama_cabang,
             'alamat' => $request->alamat,
             'telepon' => $request->telepon,
