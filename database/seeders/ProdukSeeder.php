@@ -3,32 +3,61 @@
 namespace Database\Seeders;
 
 use App\Models\ProdukModel;
-use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
 
 class ProdukSeeder extends Seeder
 {
-    /**
-     * Run the database seeds.
-     */
     public function run(): void
     {
         ProdukModel::insert([
             [
-                'nama_produk' => 'Ayam Goreng',
-                'kategori' => 'Makanan',
-                'deskripsi' => 'Ayam goreng crispy dengan bumbu spesial',
-                'harga' => 8000,
+                'nama_produk' => 'Ayam Goreng Paha Bawah',
+                'deskripsi' => 'Paha bawah ayam goreng crispy bumbu spesial',
+                'harga' => 10000,
                 'id_stock_cabang' => 1,
-                'gambar_produk' => 'ayam_goreng.jpg',
+                'gambar_produk' => 'ayam_paha_bawah.jpg',
             ],
             [
-                'nama_produk' => 'Nasi',
-                'kategori' => 'Makanan',
-                'deskripsi' => 'Nasi putih',
-                'harga' => 3000,
+                'nama_produk' => 'Ayam Goreng Paha Atas',
+                'deskripsi' => 'Paha atas ayam goreng crispy bumbu spesial',
+                'harga' => 12000,
                 'id_stock_cabang' => 2,
+                'gambar_produk' => 'ayam_paha_atas.jpg',
+            ],
+            [
+                'nama_produk' => 'Ayam Goreng Dada',
+                'deskripsi' => 'Dada ayam goreng crispy bumbu spesial',
+                'harga' => 15000,
+                'id_stock_cabang' => 3,
+                'gambar_produk' => 'ayam_dada.jpg',
+            ],
+            [
+                'nama_produk' => 'Ayam Goreng Sayap',
+                'deskripsi' => 'Sayap ayam goreng crispy bumbu spesial',
+                'harga' => 9000,
+                'id_stock_cabang' => 4,
+                'gambar_produk' => 'ayam_sayap.jpg',
+            ],
+            [
+                'nama_produk' => 'Nasi Putih',
+                'deskripsi' => 'Nasi putih pulen',
+                'harga' => 5000,
+                'id_stock_cabang' => 5,
                 'gambar_produk' => 'nasi.jpg',
+            ],
+            [
+                'nama_produk' => 'Kulit Crispy',
+                'deskripsi' => 'Kulit ayam goreng crispy renyah',
+                'harga' => 7000,
+                'id_stock_cabang' => 6,
+                'gambar_produk' => 'kulit.jpg',
+            ],
+            [
+                'nama_produk' => 'Usus Crispy',
+                'deskripsi' => 'Usus ayam goreng crispy',
+                'harga' => 6000,
+                'id_stock_cabang' => 7,
+                'gambar_produk' => 'usus.jpg',
             ],
         ]);
     }

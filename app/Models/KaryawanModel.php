@@ -11,9 +11,12 @@ class KaryawanModel extends Model
 
     protected $table = 'karyawan';
     protected $primaryKey = 'id_karyawan';
-    public $incrementing = false;
+    
+    // This is the fix. 'id_karyawan' is an auto-incrementing key.
+    public $incrementing = true;
+    
     protected $fillable = [
-        "id_karyawan",
+        // 'id_karyawan' should not be fillable as it's auto-incremented
         'id_cabang',
         'nama_karyawan',
         'alamat',

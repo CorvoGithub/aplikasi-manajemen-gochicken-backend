@@ -1,0 +1,235 @@
+<?php
+
+namespace App\Http\Controllers;
+
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Carbon\Carbon;
+
+use App\Models\KaryawanModel;
+use App\Models\ProdukModel;
+use App\Models\PengeluaranModel;
+use App\Models\CabangModel;
+
+class DashboardController extends Controller
+{
+    // Statistik per-cabang
+    public function cabangStats($id)
+    {
+        // total produk pada stok_cabang untuk cabang ini
+        $totalProduk = DB::table('stok_cabang')
+            ->where('id_cabang', $id)
+            ->count();
+
+        // produk yang stoknya > 0
+        $tersedia = DB::table('stok_cabang')
+            ->where('id_cabang', $id)
+            ->where('jumlah_stok', '>', 0)
+            ->count();
+
+        // transaksi hari ini (tanggal server)
+        $todayCount = DB::table('transaksi')
+            ->whereDate('tanggal_waktu', Carbon::today())
+            ->where('id_cabang', $id)
+            ->count();
+
+        // pendapatan bulan ini
+        $revenueMonth = DB::table('transaksi')
+            ->whereYear('tanggal_waktu', Carbon::now()->year)
+            ->whereMonth('tanggal_waktu', Carbon::now()->month)
+            ->where('id_cabang', $id)
+            ->sum('total_harga');
+
+        // produk terlaris (gabungan detail_transaksi + transaksi untuk membatasi cabang)
+        $top = DB::table('detail_transaksi')
+            ->join('transaksi', 'detail_transaksi.id_transaksi', '=', 'transaksi.id_transaksi')
+            ->where('transaksi.id_cabang', $id)
+            ->select('detail_transaksi.id_produk', DB::raw('SUM(detail_transaksi.jumlah_produk) as total_qty'))
+            ->groupBy('detail_transaksi.id_produk')
+            ->orderByDesc('total_qty')
+            ->first();
+
+        $topProductName = null;
+        if ($top) {
+            $prod = DB::table('produk')->where('id_produk', $top->id_produk)->first();
+            $topProductName = $prod ? $prod->nama_produk : null;
+        }
+
+        return response()->json([
+            'status' => 'success',
+            'data' => [
+                'total_produk' => (int) $totalProduk,
+                'produk_tersedia' => (int) $tersedia,
+                'transactions_today' => (int) $todayCount,
+                'revenue_month' => (float) $revenueMonth,
+                'top_product' => $topProductName,
+            ],
+        ]);
+    }
+
+    // Optional: Statistik global untuk super-admin (agregat)
+    public function globalStats()
+    {
+        $totalProduk = DB::table('stok_cabang')->count();
+        $tersedia = DB::table('stok_cabang')->where('jumlah_stok', '>', 0)->count();
+        $todayCount = DB::table('transaksi')->whereDate('tanggal_waktu', Carbon::today())->count();
+        $revenueMonth = DB::table('transaksi')
+            ->whereYear('tanggal_waktu', Carbon::now()->year)
+            ->whereMonth('tanggal_waktu', Carbon::now()->month)
+            ->sum('total_harga');
+
+        $top = DB::table('detail_transaksi')
+            ->join('transaksi', 'detail_transaksi.id_transaksi', '=', 'transaksi.id_transaksi')
+            ->select('detail_transaksi.id_produk', DB::raw('SUM(detail_transaksi.jumlah_produk) as total_qty'))
+            ->groupBy('detail_transaksi.id_produk')
+            ->orderByDesc('total_qty')
+            ->first();
+
+        $topProductName = null;
+        if ($top) {
+            $prod = DB::table('produk')->where('id_produk', $top->id_produk)->first();
+            $topProductName = $prod ? $prod->nama_produk : null;
+        }
+
+        return response()->json([
+            'status' => 'success',
+            'data' => [
+                'total_produk' => (int) $totalProduk,
+                'produk_tersedia' => (int) $tersedia,
+                'transactions_today' => (int) $todayCount,
+                'revenue_month' => (float) $revenueMonth,
+                'top_product' => $topProductName,
+            ],
+        ]);
+    }
+
+    public function cabangChart(Request $request, $id)
+    {
+        $filter = $request->query('filter', 'tahun'); // Default changed to 'tahun' as requested
+
+        // Query pendapatan (dari transaksi)
+        $pendapatan = DB::table('transaksi')
+            ->selectRaw("DATE(tanggal_waktu) as tanggal, SUM(total_harga) as total")
+            ->where('id_cabang', $id)
+            ->when($filter === 'minggu', function ($q) {
+                // WAS: $q->whereBetween('created_at', ...
+                $q->whereBetween('tanggal_waktu', [ // NOW: Filter by the correct column
+                    now()->startOfWeek(Carbon::SUNDAY), now()->endOfWeek(Carbon::SATURDAY)
+                ]);
+            })
+            ->when($filter === 'bulan', function ($q) {
+                // WAS: $q->whereYear('created_at', ...
+                $q->whereYear('tanggal_waktu', now()->year) // NOW: Filter by the correct column
+                    ->whereMonth('tanggal_waktu', now()->month);
+            })
+            ->when($filter === 'tahun', function ($q) {
+                // WAS: $q->whereYear('created_at', ...
+                $q->whereYear('tanggal_waktu', now()->year); // NOW: Filter by the correct column
+            })
+            ->groupBy('tanggal')
+            ->orderBy('tanggal')
+            ->get();
+
+        // Query pengeluaran
+        $pengeluaran = DB::table('pengeluaran')
+            // This table uses 'tanggal', not 'tanggal_waktu'
+            ->selectRaw("DATE(tanggal) as tanggal, SUM(jumlah) as total")
+            ->where('id_cabang', $id)
+            ->when($filter === 'minggu', function ($q) {
+                // WAS: $q->whereBetween('created_at', ...
+                $q->whereBetween('tanggal', [ // NOW: Filter by the correct column
+                    now()->startOfWeek(Carbon::SUNDAY), now()->endOfWeek(Carbon::SATURDAY)
+                ]);
+            })
+            ->when($filter === 'bulan', function ($q) {
+                // WAS: $q->whereYear('created_at', ...
+                $q->whereYear('tanggal', now()->year) // NOW: Filter by the correct column
+                    ->whereMonth('tanggal', now()->month);
+            })
+            ->when($filter === 'tahun', function ($q) {
+                // WAS: $q->whereYear('created_at', ...
+                $q->whereYear('tanggal', now()->year); // NOW: Filter by the correct column
+            })
+            ->groupBy('tanggal')
+            ->orderBy('tanggal')
+            ->get();
+
+        return response()->json([
+            'status' => 'success',
+            'data' => [
+                'pendapatan' => $pendapatan,
+                'pengeluaran' => $pengeluaran,
+            ]
+        ]);
+    }
+
+    public function userActivities(Request $request)
+    {
+        // Get the authenticated user
+        $user = $request->user();
+
+        // We only show activities for Admin Cabang. Super Admin's activities might be too broad.
+        if ($user->role !== 'admin cabang') {
+            return response()->json([
+                'status' => 'success',
+                'data' => []
+            ]);
+        }
+
+        $cabangId = $user->id_cabang;
+        
+        // --- Fetch Activities from Different Tables ---
+        
+        // Fetch recent karyawan (employees) added by this admin
+        $karyawanActivities = KaryawanModel::where('id_cabang', $cabangId)
+        ->orderBy('created_at', 'desc')
+        ->take(5)
+        ->get()
+        ->map(function ($item) {
+            return [
+                'description' => "Tambah Karyawan baru: {$item->nama_karyawan}",
+                'timestamp' => Carbon::parse($item->created_at)->toISOString(),
+                'type' => 'add'
+            ];
+        });
+
+        // Fetch recent pengeluaran (expenses) by this admin's branch
+        $pengeluaranActivities = PengeluaranModel::where('id_cabang', $cabangId)
+        ->orderBy('created_at', 'desc')
+        ->take(5)
+        ->get()
+        ->map(function ($item) {
+            return [
+                'description' => "Pengeluaran Rp " . number_format($item->jumlah, 0, ',', '.') . " untuk {$item->keterangan}",
+                'timestamp' => Carbon::parse($item->created_at)->toISOString(),
+                'type' => 'expense'
+            ];
+        });
+        
+        // Fetch recent produk (products) added/updated by this admin's branch
+        $produkActivities = ProdukModel::where('id_stock_cabang', $cabangId)
+        ->orderBy('created_at', 'desc')
+        ->take(5)
+        ->get()
+        ->map(function ($item) {
+            return [
+                'description' => "Tambah/Update produk: {$item->nama_produk}",
+                'timestamp' => Carbon::parse($item->created_at)->toISOString(),
+                'type' => 'update'
+            ];
+        });
+
+        // Combine all activities into a single collection
+        $allActivities = collect([])->concat($karyawanActivities)
+                                    ->concat($pengeluaranActivities)
+                                    ->concat($produkActivities);
+
+        // Sort the activities by timestamp in descending order and take the top 10
+        $recentActivities = $allActivities->sortByDesc('timestamp')->take(10)->values()->all();
+
+        return response()->json([
+            'status' => 'success',
+            'data' => $recentActivities
+        ]);
+    }
+}

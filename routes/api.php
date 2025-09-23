@@ -8,6 +8,7 @@ use App\Http\Controllers\KaryawanController;
 use App\Http\Controllers\ManageAdminCabangController;
 use App\Http\Controllers\PengeluaranController;
 use App\Http\Controllers\ProdukController;
+use App\Http\Controllers\DashboardController;
 
 // Public routes for authentication
 Route::post('/super-admin/login', [AuthController::class, 'loginSuperAdmin']);
@@ -16,15 +17,23 @@ Route::get('/cabang', [CabangController::class, 'index']);
 
 // Routes protected by Sanctum middleware
 Route::middleware('auth:sanctum')->group(function () {
-    // Current authenticated user
+
+    // ==== Current authenticated user ====
     Route::get('/user', function (Request $request) {
         return $request->user();
     });
 
-    // Logout route
+    // ==== Logout route ====
     Route::post('/logout', [AuthController::class, 'logout']);
 
-    // Routes that can only be accessed by Super Admin
+    // ==== Get data for dashboard as Admin Cabang ====
+    Route::get('/dashboard', [DashboardController::class, 'globalStats']);
+    Route::get('/dashboard/cabang/{id}', [DashboardController::class, 'cabangStats']);
+    Route::get('/dashboard/cabang/{id}/chart', [DashboardController::class, 'cabangChart']);
+
+    Route::get('/dashboard/user/activities', [DashboardController::class, 'userActivities']);
+
+    // ==== Routes that can only be accessed by Super Admin ====
     Route::middleware('role:super admin')->group(function () {
         // Cabang Management API
         Route::post('/cabang', [CabangController::class, 'store']);
@@ -56,4 +65,5 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::put('/pengeluaran/{id_pengeluaran}', [PengeluaranController::class, 'update']);
         Route::delete('/pengeluaran/{id_pengeluaran}', [PengeluaranController::class, 'destroy']);
     });
+
 });

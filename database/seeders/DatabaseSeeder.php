@@ -20,6 +20,10 @@ class DatabaseSeeder extends Seeder
             CabangSeeder::class,
             AdminCabangSeeder::class,
             SuperAdminSeeder::class,
+            TransaksiSeeder::class,
+            PengeluaranSeeder::class,
+            JenisPengeluaranSeeder::class
+            // DetailTransaksiSeeder::class
         ]);
     }
 }

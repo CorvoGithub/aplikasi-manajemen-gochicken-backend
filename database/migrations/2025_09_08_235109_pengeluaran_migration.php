@@ -15,7 +15,6 @@ return new class extends Migration
             $table->increments('id_pengeluaran');
             $table->integer('id_cabang');
             $table->integer('id_jenis');
-            // $table->integer('id_karyawan');
             $table->date('tanggal');
             $table->decimal('jumlah', 15, 2);
             $table->string('keterangan')->nullable();
