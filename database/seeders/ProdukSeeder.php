@@ -16,6 +16,7 @@ class ProdukSeeder extends Seeder
         ProdukModel::insert([
             [
                 'nama_produk' => 'Ayam Goreng',
+                'kategori' => 'Makanan',
                 'deskripsi' => 'Ayam goreng crispy dengan bumbu spesial',
                 'harga' => 8000,
                 'id_stock_cabang' => 1,
@@ -23,6 +24,7 @@ class ProdukSeeder extends Seeder
             ],
             [
                 'nama_produk' => 'Nasi',
+                'kategori' => 'Makanan',
                 'deskripsi' => 'Nasi putih',
                 'harga' => 3000,
                 'id_stock_cabang' => 2,

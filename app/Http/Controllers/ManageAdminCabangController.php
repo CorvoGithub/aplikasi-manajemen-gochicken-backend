@@ -95,7 +95,20 @@ class ManageAdminCabangController extends Controller
     }
 
     public function deleteAdminCabang($id_user) {
-        // isi logika delete
-        return response()->json(['message' => 'Delete logic for admin cabang.']);
+        $admin = UsersModel::find($id_user);
+
+        if (!$admin) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Admin tidak ditemukan.',
+            ], 404);
+        }
+
+        $admin->delete();
+
+        return response()->json([
+            'status' => 'success',
+            'message' => 'Admin berhasil dihapus.',
+        ], 200);
     }
 }

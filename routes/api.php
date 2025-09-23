@@ -35,6 +35,8 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/admin-cabang', [ManageAdminCabangController::class, 'listAdmin']);
         Route::get('/cabang-without-admin', [ManageAdminCabangController::class, 'getCabangWithoutAdmin']);
         Route::post('/create-admin-cabang', [ManageAdminCabangController::class, 'createAdminCabang']);
+        Route::put('/admin-cabang/{id_user}', [ManageAdminCabangController::class, 'updateAdminCabang']);
+        Route::delete('/admin-cabang/{id_user}', [ManageAdminCabangController::class, 'deleteAdminCabang']);
 
         // Produk Management API
         Route::get('/produk', [ProdukController::class, 'index']);

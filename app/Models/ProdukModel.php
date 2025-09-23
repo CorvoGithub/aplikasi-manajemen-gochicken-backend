@@ -14,14 +14,21 @@ class ProdukModel extends Model
     protected $fillable = [
         'id_produk',
         'nama_produk',
+        'kategori',
         'deskripsi',
         'harga',
         'id_stock_cabang',
         'gambar_produk',
     ];
+    protected $appends = ['gambar_produk_url'];
 
     public function stockCabang()
     {
         return $this->hasMany(StokCabangModel::class, 'id_stock_cabang');
+    }
+
+    public function getGambarProdukUrlAttribute()
+    {
+        return $this->gambar_produk ? asset('storage/' . $this->gambar_produk) : null;
     }
 }

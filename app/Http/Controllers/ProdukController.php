@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use Illuminate\Support\Facades\Storage;
 use App\Models\ProdukModel;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
@@ -24,15 +25,16 @@ class ProdukController extends Controller
     /**
      * Tambah produk baru.
      */
+    // In App\Http\Controllers\ProdukController.php
+
     public function store(Request $request)
     {
         $validator = Validator::make($request->all(), [
-            'id_produk' => 'required',
             'nama_produk' => 'required',
+            'kategori' => 'required',
             'deskripsi' => 'required',
-            'harga' => 'required',
-            'id_stock_cabang' => 'required',
-            'gambar_produk' => 'nullable',
+            'harga' => 'required|numeric',
+            'gambar_produk' => 'nullable|image|mimes:jpg,jpeg,png|max:2048',
         ]);
 
         if ($validator->fails()) {
@@ -43,20 +45,21 @@ class ProdukController extends Controller
             ], 422);
         }
 
-        $produk = ProdukModel::create([
-            'id_produk' => $request->id_produk,
-            'nama_produk' => $request->nama_produk,
-            'deskripsi' => $request->deskripsi,
-            'harga' => $request->harga,
-            'id_stock_cabang' => $request->id_stock_cabang,
-            'gambar_produk' => $request->gambar_produk,
-        ]);
-
-
+        // Cek dan simpan gambar terlebih dahulu
+        $gambarPath = null;
         if ($request->hasFile('gambar_produk')) {
-            $produk->gambar_produk = $request->file('gambar_produk')->store('produk_images', 'public');
-            $produk->save();
+            $gambarPath = $request->file('gambar_produk')->store('produk_images', 'public');
         }
+
+        $produkData = $request->only(['nama_produk', 'kategori', 'deskripsi', 'harga']);
+        $produkData['gambar_produk'] = $gambarPath;
+
+        if ($request->filled('id_stock_cabang')) {
+            $produkData['id_stock_cabang'] = $request->id_stock_cabang;
+        }
+
+        // Buat produk dengan data gambar yang sudah ada
+        $produk = ProdukModel::create($produkData);
 
         return response()->json([
             'status' => 'success',
@@ -64,6 +67,7 @@ class ProdukController extends Controller
             'data' => $produk,
         ], 201);
     }
+
 
     /**
      * Edit data produk.
@@ -81,10 +85,11 @@ class ProdukController extends Controller
 
         $validator = Validator::make($request->all(), [
             'nama_produk' => 'required',
+            'kategori' => 'required',
             'deskripsi' => 'required',
-            'harga' => 'required',
-            'id_stock_cabang' => 'required',
-            'gambar_produk' => 'nullable',
+            'harga' => 'required|numeric',
+            'id_stock_cabang' => 'nullable',
+            'gambar_produk' => 'nullable|image|mimes:jpg,jpeg,png|max:2048',
         ]);
 
         if ($validator->fails()) {
@@ -95,11 +100,18 @@ class ProdukController extends Controller
             ], 422);
         }
 
-        $produk->nama_produk = $request->nama_produk ?? $produk->nama_produk;
-        $produk->deskripsi = $request->deskripsi ?? $produk->deskripsi;
-        $produk->harga = $request->harga ?? $produk->harga;
-        $produk->id_stock_cabang = $request->id_stock_cabang ?? $produk->id_stock_cabang;
+        $produk->nama_produk = $request->nama_produk;
+        $produk->kategori = $request->kategori;
+        $produk->deskripsi = $request->deskripsi;
+        $produk->harga = $request->harga;
+        $produk->id_stock_cabang = $request->id_stock_cabang;
+
+        // Tambahkan logika untuk menghapus gambar lama jika ada gambar baru
         if ($request->hasFile('gambar_produk')) {
+            // Hapus gambar lama jika ada
+            if ($produk->gambar_produk && Storage::disk('public')->exists($produk->gambar_produk)) {
+                Storage::disk('public')->delete($produk->gambar_produk);
+            }
             $produk->gambar_produk = $request->file('gambar_produk')->store('produk_images', 'public');
         }
 
