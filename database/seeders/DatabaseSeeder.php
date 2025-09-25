@@ -22,8 +22,9 @@ class DatabaseSeeder extends Seeder
             SuperAdminSeeder::class,
             TransaksiSeeder::class,
             PengeluaranSeeder::class,
-            JenisPengeluaranSeeder::class
-            // DetailTransaksiSeeder::class
+            JenisPengeluaranSeeder::class,
+            DetailTransaksiSeeder::class,
+            BahanBakuSeeder::class,
         ]);
     }
 }

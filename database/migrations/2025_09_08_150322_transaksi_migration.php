@@ -18,8 +18,7 @@ return new class extends Migration
             $table->decimal('total_harga', 12, 2);
             $table->string('metode_pembayaran', 50)->nullable();
             $table->string('nama_pelanggan', 100)->nullable();
-            $table->integer('id_cabang')->nullable();
-            $table->integer('id_detail')->nullable();
+            $table->string('id_cabang')->nullable();
             $table->timestamps();
         });
     }

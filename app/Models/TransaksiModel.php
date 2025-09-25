@@ -20,10 +20,7 @@ class TransaksiModel extends Model
         'total_harga',
         'metode_pembayaran',
         'nama_pelanggan',
-        'id_user',
         'id_cabang',
-        'id_produk',
-        'id_detail',
     ];
 
     // Relasi ke User

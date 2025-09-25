@@ -3,12 +3,15 @@
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\AuthController;
+use App\Http\Controllers\BahanBakuController;
 use App\Http\Controllers\CabangController;
 use App\Http\Controllers\KaryawanController;
 use App\Http\Controllers\ManageAdminCabangController;
 use App\Http\Controllers\PengeluaranController;
 use App\Http\Controllers\ProdukController;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\TransaksiController;
+use App\Models\BahanBakuModel;
 
 // Public routes for authentication
 Route::post('/super-admin/login', [AuthController::class, 'loginSuperAdmin']);
@@ -52,6 +55,18 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/produk', [ProdukController::class, 'store']);
         Route::put('/produk/{id_produk}', [ProdukController::class, 'update']);
         Route::delete('/produk/{id_produk}', [ProdukController::class, 'destroy']);
+
+        // Bahan Baku Management API
+        Route::get('/bahan-baku', [BahanBakuController::class, 'index']);
+        Route::post('/bahan-baku', [BahanBakuController::class, 'store']);
+        Route::put('/bahan-baku/{id_bahan_baku}', [BahanBakuController::class, 'update']);
+        Route::delete('/bahan-baku/{id_bahan_baku}', [BahanBakuController::class, 'destroy']);
+
+        // Transaksi Management API
+        Route::get('/transaksi', [TransaksiController::class, 'index']);
+        Route::post('/transaksi', [TransaksiController::class, 'store']);
+        Route::get('/transaksi/{id_transaksi}', [TransaksiController::class, 'show']);
+        Route::delete('/transaksi/{id_transaksi}', [TransaksiController::class, 'destroy']);
 
         // Karyawan Management API
         Route::get('/karyawan', [KaryawanController::class, 'index']);
