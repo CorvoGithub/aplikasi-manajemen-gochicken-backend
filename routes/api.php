@@ -11,7 +11,9 @@ use App\Http\Controllers\PengeluaranController;
 use App\Http\Controllers\ProdukController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\TransaksiController;
+use App\Http\Controllers\ReportController;
 use App\Models\BahanBakuModel;
+
 
 // Public routes for authentication
 Route::post('/super-admin/login', [AuthController::class, 'loginSuperAdmin']);
@@ -33,8 +35,19 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/dashboard', [DashboardController::class, 'globalStats']);
     Route::get('/dashboard/cabang/{id}', [DashboardController::class, 'cabangStats']);
     Route::get('/dashboard/cabang/{id}/chart', [DashboardController::class, 'cabangChart']);
-
     Route::get('/dashboard/user/activities', [DashboardController::class, 'userActivities']);
+
+    // ==== Get data for Reports as Admin Cabang (UNPAGINATED) ====
+    Route::get('/reports/cabang/{id}', [ReportController::class, 'cabangReport']);
+    // Route::get('/reports/cabang/{id}/products', [ReportController::class, 'productReport']);
+    // Route::get('/reports/cabang/{id}/sales', [ReportController::class, 'salesReport']);
+    // Route::get('/reports/cabang/{id}/employees', [ReportController::class, 'employeeReport']);
+
+    // ==== Get data for Reports as Admin Cabang (PAGINATED) ====
+    Route::get('/reports/cabang/{id}/products', [ReportController::class, 'productReportPaginated']);
+    Route::get('/reports/cabang/{id}/sales/transactions', [ReportController::class, 'salesTransactionsPaginated']);
+    Route::get('/reports/cabang/{id}/sales/expenses', [ReportController::class, 'salesExpensesPaginated']);
+    Route::get('/reports/cabang/{id}/employees', [ReportController::class, 'employeeReportPaginated']);
 
     // ==== Routes that can only be accessed by Super Admin ====
     Route::middleware('role:super admin')->group(function () {
