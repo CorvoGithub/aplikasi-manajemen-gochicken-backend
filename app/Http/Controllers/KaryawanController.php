@@ -14,7 +14,7 @@ class KaryawanController extends Controller
      */
     public function index()
     {
-        $karyawan = KaryawanModel::all();
+        $karyawan = KaryawanModel::with('cabang')->get();
 
         return response()->json([
             'status' => 'success',
@@ -28,7 +28,6 @@ class KaryawanController extends Controller
     public function store(Request $request)
     {
         $validator = Validator::make($request->all(), [
-            'id_karyawan' => 'required',
             'id_cabang' => 'required',
             'nama_karyawan' => 'required',
             'alamat' => 'required',
