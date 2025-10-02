@@ -30,6 +30,7 @@ class BahanBakuController extends Controller
             'id_bahan_baku' => 'required',
             'nama_bahan' => 'required',
             'harga_satuan' => 'required|numeric',
+            'satuan' => 'nullable|numeric',
             'jumlah_stok' => 'required|numeric',
         ]);
 
@@ -68,6 +69,7 @@ class BahanBakuController extends Controller
             'nama_bahan' => 'required',
             'harga_satuan' => 'required|numeric',
             'jumlah_stok' => 'required|numeric',
+            'satuan' => 'nullable|numeric',
         ]);
 
         if ($validator->fails()) {

@@ -67,11 +67,113 @@ class DashboardController extends Controller
         ]);
     }
 
+    public function globalChart(Request $request)
+    {
+        $filter = $request->query('filter', 'tahun');
+
+        $pendapatan = DB::table('transaksi')
+            ->selectRaw("DATE(tanggal_waktu) as tanggal, SUM(total_harga) as total")
+            ->when($filter === 'minggu', function ($q) {
+                $q->whereBetween('tanggal_waktu', [now()->startOfWeek(Carbon::SUNDAY), now()->endOfWeek(Carbon::SATURDAY)]);
+            })
+            ->when($filter === 'bulan', function ($q) {
+                $q->whereYear('tanggal_waktu', now()->year)->whereMonth('tanggal_waktu', now()->month);
+            })
+            ->when($filter === 'tahun', function ($q) {
+                $q->whereYear('tanggal_waktu', now()->year);
+            })
+            ->groupBy('tanggal')
+            ->orderBy('tanggal')
+            ->get();
+
+        $pengeluaran = DB::table('pengeluaran')
+            ->selectRaw("DATE(tanggal) as tanggal, SUM(jumlah) as total")
+            ->when($filter === 'minggu', function ($q) {
+                $q->whereBetween('tanggal', [now()->startOfWeek(Carbon::SUNDAY), now()->endOfWeek(Carbon::SATURDAY)]);
+            })
+            ->when($filter === 'bulan', function ($q) {
+                $q->whereYear('tanggal', now()->year)->whereMonth('tanggal', now()->month);
+            })
+            ->when($filter === 'tahun', function ($q) {
+                $q->whereYear('tanggal', now()->year);
+            })
+            ->groupBy('tanggal')
+            ->orderBy('tanggal')
+            ->get();
+
+        return response()->json([
+            'status' => 'success',
+            'data' => [
+                'pendapatan' => $pendapatan,
+                'pengeluaran' => $pengeluaran,
+            ]
+        ]);
+    }
+
+    public function globalActivities(Request $request)
+    {
+        $user = $request->user();
+
+        if (!$user || $user->role !== 'super admin') {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Unauthorized'
+            ], 403);
+        }
+
+        $karyawanActivities = KaryawanModel::orderBy('created_at', 'desc')
+            ->take(5)
+            ->get()
+            ->map(function ($item) {
+                return [
+                    'description' => "Tambah Karyawan baru: {$item->nama_karyawan}",
+                    'timestamp' => optional($item->created_at)->toDateTimeString() ?? now()->toDateTimeString(),
+                    'type' => 'add'
+                ];
+            });
+
+        $pengeluaranActivities = PengeluaranModel::orderBy('created_at', 'desc')
+            ->take(5)
+            ->get()
+            ->map(function ($item) {
+                return [
+                    'description' => "Pengeluaran Rp " . number_format($item->jumlah, 0, ',', '.') . " untuk {$item->keterangan}",
+                    'timestamp' => optional($item->created_at)->toDateTimeString() ?? now()->toDateTimeString(),
+                    'type' => 'expense'
+                ];
+            });
+
+        $produkActivities = ProdukModel::orderBy('created_at', 'desc')
+            ->take(5)
+            ->get()
+            ->map(function ($item) {
+                return [
+                    'description' => "Tambah/Update produk: {$item->nama_produk}",
+                    'timestamp' => optional($item->created_at)->toDateTimeString() ?? now()->toDateTimeString(),
+                    'type' => 'update'
+                ];
+            });
+
+        $recentActivities = collect()
+            ->concat($karyawanActivities)
+            ->concat($pengeluaranActivities)
+            ->concat($produkActivities)
+            ->sortByDesc('timestamp')
+            ->take(10)
+            ->values()
+            ->all();
+
+        return response()->json([
+            'status' => 'success',
+            'data' => $recentActivities
+        ]);
+    }
+
+
     // Optional: Statistik global untuk super-admin (agregat)
     public function globalStats()
     {
-        $totalProduk = DB::table('stok_cabang')->count();
-        $tersedia = DB::table('stok_cabang')->where('jumlah_stok', '>', 0)->count();
+        $totalProduk = DB::table('produk')->count();
         $todayCount = DB::table('transaksi')->whereDate('tanggal_waktu', Carbon::today())->count();
         $revenueMonth = DB::table('transaksi')
             ->whereYear('tanggal_waktu', Carbon::now()->year)
@@ -95,7 +197,6 @@ class DashboardController extends Controller
             'status' => 'success',
             'data' => [
                 'total_produk' => (int) $totalProduk,
-                'produk_tersedia' => (int) $tersedia,
                 'transactions_today' => (int) $todayCount,
                 'revenue_month' => (float) $revenueMonth,
                 'top_product' => $topProductName,
@@ -177,9 +278,9 @@ class DashboardController extends Controller
         }
 
         $cabangId = $user->id_cabang;
-        
+
         // --- Fetch Activities from Different Tables ---
-        
+
         // Fetch recent karyawan (employees) added by this admin
         $karyawanActivities = KaryawanModel::where('id_cabang', $cabangId)
         ->orderBy('created_at', 'desc')
@@ -205,7 +306,7 @@ class DashboardController extends Controller
                 'type' => 'expense'
             ];
         });
-        
+
         // Fetch recent produk (products) added/updated by this admin's branch
         $produkActivities = ProdukModel::where('id_stock_cabang', $cabangId)
         ->orderBy('created_at', 'desc')

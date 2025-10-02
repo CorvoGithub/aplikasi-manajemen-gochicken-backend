@@ -15,6 +15,7 @@ return new class extends Migration
             $table->increments('id_bahan_baku');
             $table->string('nama_bahan', 100);
             $table->decimal('harga_satuan', 15, 2);
+            $table->decimal('satuan')->nullable();
             $table->integer('jumlah_stok');
             $table->timestamps();
         });

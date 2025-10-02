@@ -31,6 +31,12 @@ Route::middleware('auth:sanctum')->group(function () {
     // ==== Logout route ====
     Route::post('/logout', [AuthController::class, 'logout']);
 
+    // ==== Get data for dashboard as Super Admin ====
+    Route::get('/dashboard', [DashboardController::class, 'globalStats']);
+    Route::get('/dashboard/chart', [DashboardController::class, 'globalChart']);
+    Route::get('/dashboard/activities', [DashboardController::class, 'globalActivities']);
+
+
     // ==== Get data for dashboard as Admin Cabang ====
     Route::get('/dashboard', [DashboardController::class, 'globalStats']);
     Route::get('/dashboard/cabang/{id}', [DashboardController::class, 'cabangStats']);
