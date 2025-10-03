@@ -55,6 +55,10 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/reports/cabang/{id}/sales/expenses', [ReportController::class, 'salesExpensesPaginated']);
     Route::get('/reports/cabang/{id}/employees', [ReportController::class, 'employeeReportPaginated']);
 
+    // ==== Get data for Reports as Super Admin (ALL CABANG) ====
+    Route::get('/reports/all', [ReportController::class, 'allCabangReport']);
+
+
     // ==== Routes that can only be accessed by Super Admin ====
     Route::middleware('role:super admin')->group(function () {
         // Cabang Management API

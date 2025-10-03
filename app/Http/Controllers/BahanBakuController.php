@@ -27,11 +27,10 @@ class BahanBakuController extends Controller
     public function store(Request $request)
     {
         $validator = Validator::make($request->all(), [
-            'id_bahan_baku' => 'required',
             'nama_bahan' => 'required',
-            'harga_satuan' => 'required|numeric',
-            'satuan' => 'nullable|numeric',
-            'jumlah_stok' => 'required|numeric',
+            'harga_satuan' => 'required',
+            'satuan' => 'required',
+            'jumlah_stok' => 'required',
         ]);
 
         if ($validator->fails()) {
@@ -67,9 +66,9 @@ class BahanBakuController extends Controller
 
         $validator = Validator::make($request->all(), [
             'nama_bahan' => 'required',
-            'harga_satuan' => 'required|numeric',
-            'jumlah_stok' => 'required|numeric',
-            'satuan' => 'nullable|numeric',
+            'satuan' => 'required',
+            'harga_satuan' => 'required',
+            'jumlah_stok' => 'required',
         ]);
 
         if ($validator->fails()) {
