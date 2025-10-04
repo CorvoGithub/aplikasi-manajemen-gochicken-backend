@@ -89,6 +89,9 @@ class ReportController extends Controller
         ]);
     }
 
+    /**
+     * Fetch all reports across all branches for Super Admin dashboard.
+     */
     public function allCabangReport(Request $request)
     {
         $filter = $request->query('filter', 'bulan'); // default bulan
@@ -163,6 +166,55 @@ class ReportController extends Controller
             ]
         ]);
     }
+
+    public function productReportSuperAdmin(Request $request)
+    {
+        $products = DB::table('produk as p')
+            ->join('stok_cabang as sc', 'p.id_produk', '=', 'sc.id_produk')
+            ->select('p.nama_produk', 'p.kategori', 'p.harga', 'sc.jumlah_stok')
+            ->orderBy('p.nama_produk')
+            ->paginate($request->get('limit', 10));
+
+        return response()->json($products);
+    }
+
+    /**
+     * Fetch paginated list of sales transactions for super admin across all branches.
+     */
+    public function salesTransactionsSuperAdmin(Request $request)
+    {
+        $transaksi = DB::table('transaksi')
+            ->select('kode_transaksi', 'tanggal_waktu', 'metode_pembayaran', 'total_harga')
+            ->orderByDesc('tanggal_waktu')
+            ->paginate($request->get('limit', 10));
+
+        return response()->json($transaksi);
+    }
+
+    /**
+     * Fetch paginated list of expenses for super admin across all branches.
+     */
+    public function salesExpensesSuperAdmin(Request $request)
+    {
+        $pengeluaran = DB::table('pengeluaran as p')
+            ->join('jenis_pengeluaran as jp', 'p.id_jenis', '=', 'jp.id_jenis')
+            ->select('p.tanggal', 'jp.jenis_pengeluaran as jenis', 'p.jumlah', 'p.keterangan')
+            ->orderByDesc('p.tanggal')
+            ->paginate($request->get('limit', 10));
+
+        return response()->json($pengeluaran);
+    }
+
+    public function employeeReportSuperAdmin(Request $request)
+    {
+        $karyawan = DB::table('karyawan')
+            ->select('nama_karyawan', 'alamat', 'telepon', 'gaji')
+            ->orderBy('nama_karyawan')
+            ->paginate($request->get('limit', 10));
+
+        return response()->json($karyawan);
+    }
+
 
     //----------------------------------------------------------------------------------
     // All new paginated report methods below

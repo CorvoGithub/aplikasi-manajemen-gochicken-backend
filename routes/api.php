@@ -57,7 +57,11 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // ==== Get data for Reports as Super Admin (ALL CABANG) ====
     Route::get('/reports/all', [ReportController::class, 'allCabangReport']);
-
+    Route::get('/reports/products', [ReportController::class, 'productReportSuperAdmin']);
+    Route::get('/reports/sales', [ReportController::class, 'salesReportSuperAdmin']);
+    Route::get('/reports/sales/transactions', [ReportController::class, 'salesTransactionsSuperAdmin']);
+    Route::get('/reports/sales/expenses', [ReportController::class, 'salesExpensesSuperAdmin']);
+    Route::get('/reports/employees', [ReportController::class, 'employeeReportSuperAdmin']);
 
     // ==== Routes that can only be accessed by Super Admin ====
     Route::middleware('role:super admin')->group(function () {
