@@ -306,16 +306,6 @@ class DashboardController extends Controller
                 'type' => 'update'
             ];
         });
-            ->orderBy('created_at', 'desc')
-            ->take(5)
-            ->get()
-            ->map(function ($item) {
-                return [
-                    'description' => "Pengeluaran Rp " . number_format($item->jumlah, 0, ',', '.') . " untuk {$item->keterangan}",
-                    'timestamp' => Carbon::parse($item->created_at)->toISOString(),
-                    'type' => 'expense'
-                ];
-            });
         
         $produkActivities = ProdukModel::where('id_stock_cabang', $cabangId) // This logic might need adjustment based on your schema
             ->orderBy('created_at', 'desc')

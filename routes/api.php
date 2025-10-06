@@ -30,13 +30,6 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/dashboard/chart', [DashboardController::class, 'globalChart']);
     Route::get('/dashboard/activities', [DashboardController::class, 'globalActivities']);
 
-
-    // ==== Get data for dashboard as Super Admin ====
-    Route::get('/dashboard', [DashboardController::class, 'globalStats']);
-    Route::get('/dashboard/chart', [DashboardController::class, 'globalChart']);
-    Route::get('/dashboard/activities', [DashboardController::class, 'globalActivities']);
-
-
     // --- DASHBOARD & REPORTS (FOR ADMIN CABANG) ---
     Route::get('/dashboard/cabang/{id}', [DashboardController::class, 'cabangStats']);
     Route::get('/dashboard/cabang/{id}/chart', [DashboardController::class, 'cabangChart']);
@@ -46,14 +39,6 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/reports/cabang/{id}/sales/transactions', [ReportController::class, 'salesTransactionsPaginated']);
     Route::get('/reports/cabang/{id}/sales/expenses', [ReportController::class, 'salesExpensesPaginated']);
     Route::get('/reports/cabang/{id}/employees', [ReportController::class, 'employeeReportPaginated']);
-
-    // ==== Get data for Reports as Super Admin (ALL CABANG) ====
-    Route::get('/reports/all', [ReportController::class, 'allCabangReport']);
-    Route::get('/reports/products', [ReportController::class, 'productReportSuperAdmin']);
-    Route::get('/reports/sales', [ReportController::class, 'salesReportSuperAdmin']);
-    Route::get('/reports/sales/transactions', [ReportController::class, 'salesTransactionsSuperAdmin']);
-    Route::get('/reports/sales/expenses', [ReportController::class, 'salesExpensesSuperAdmin']);
-    Route::get('/reports/employees', [ReportController::class, 'employeeReportSuperAdmin']);
 
     // ==== Get data for Reports as Super Admin (ALL CABANG) ====
     Route::get('/reports/all', [ReportController::class, 'allCabangReport']);
