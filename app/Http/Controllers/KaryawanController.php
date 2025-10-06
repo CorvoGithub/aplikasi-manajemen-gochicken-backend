@@ -130,4 +130,16 @@ class KaryawanController extends Controller
             'message' => 'Karyawan berhasil dihapus.',
         ], 200);
     }
+
+    public function getKaryawanByCabang($id_cabang)
+    {
+        $karyawan = KaryawanModel::where('id_cabang', $id_cabang)
+            ->orderBy('nama_karyawan', 'asc')
+            ->get();
+
+        return response()->json([
+            'status' => 'success',
+            'data' => $karyawan,
+        ]);
+    }
 }

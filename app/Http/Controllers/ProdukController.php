@@ -6,6 +6,8 @@ use Illuminate\Support\Facades\Storage;
 use App\Models\ProdukModel;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Facades\DB;
+use App\Models\StokCabangModel;
 
 class ProdukController extends Controller
 {
@@ -144,5 +146,91 @@ class ProdukController extends Controller
             'status' => 'success',
             'message' => 'Produk berhasil dihapus.',
         ], 200);
+    }
+
+    public function getProdukByCabang($id_cabang)
+    {
+        try {
+            $produkStok = ProdukModel::select(
+                'produk.id_produk',
+                'produk.nama_produk',
+                'produk.kategori',
+                'produk.harga',
+                'produk.gambar_produk',
+                'stok_cabang.jumlah_stok',
+                'stok_cabang.id_stock_cabang'
+            )
+            ->join('stok_cabang', 'produk.id_produk', '=', 'stok_cabang.id_produk')
+            ->where('stok_cabang.id_cabang', $id_cabang)
+            ->orderBy('produk.nama_produk', 'asc')
+            ->get();
+
+            // Append the full URL for the image
+            $produkStok->each(function ($item) {
+                if ($item->gambar_produk) {
+                    $item->gambar_url = url(Storage::url($item->gambar_produk));
+                }
+            });
+
+            return response()->json([
+                'status' => 'success',
+                'data' => $produkStok,
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Gagal mengambil data produk cabang.',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    public function updateStok(Request $request, $id_stock_cabang)
+    {
+        $validator = Validator::make($request->all(), [
+            'jumlah' => 'required|integer', // e.g., +1 or -1
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Validasi gagal',
+                'errors' => $validator->errors()
+            ], 422);
+        }
+        
+        try {
+            $stok = StokCabangModel::findOrFail($id_stock_cabang);
+
+            // Use a transaction to ensure data integrity
+            DB::transaction(function () use ($stok, $request) {
+                $newStok = $stok->jumlah_stok + $request->jumlah;
+                
+                // Prevent stock from going below zero
+                if ($newStok < 0) {
+                    throw new \Exception("Stok tidak boleh kurang dari nol.");
+                }
+                
+                $stok->jumlah_stok = $newStok;
+                $stok->save();
+            });
+
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Stok berhasil diupdate.',
+                'data' => $stok,
+            ]);
+
+        } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
+             return response()->json([
+                'status' => 'error',
+                'message' => 'Data stok tidak ditemukan.',
+            ], 404);
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => 'error',
+                'message' => $e->getMessage()
+            ], 400); // Bad request (e.g., trying to make stock negative)
+        }
     }
 }

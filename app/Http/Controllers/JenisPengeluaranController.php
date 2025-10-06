@@ -26,9 +26,10 @@ class JenisPengeluaranController extends Controller
      */
     public function store(Request $request)
     {
+        // ✨ FIX: Removed 'id_jenis_pengeluaran' from validation.
+        // The database should handle auto-incrementing the ID.
         $validator = Validator::make($request->all(), [
-            'id_jenis_pengeluaran' => 'required',
-            'jenis_pengeluaran' => 'required',
+            'jenis_pengeluaran' => 'required|string|unique:jenis_pengeluaran,jenis_pengeluaran',
         ]);
 
         if ($validator->fails()) {
@@ -39,14 +40,14 @@ class JenisPengeluaranController extends Controller
             ], 422);
         }
 
+        // ✨ FIX: Removed 'id_jenis_pengeluaran' from the create array.
         $jenis_pengeluaran = JenisPengeluaranModel::create([
-            'id_jenis_pengeluaran' => $request->id_jenis_pengeluaran,
             'jenis_pengeluaran' => $request->jenis_pengeluaran,
         ]);
 
         return response()->json([
             'status' => 'success',
-            'message' => 'jenis pengeluaran berhasil ditambahkan.',
+            'message' => 'Jenis pengeluaran berhasil ditambahkan.',
             'data' => $jenis_pengeluaran,
         ], 201);
     }

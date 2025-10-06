@@ -15,7 +15,7 @@ class ReportController extends Controller
     {
         $filter = $request->query('filter', 'bulan'); // default 'bulan'
 
-        // 1. DATA FOR SALES TREND CHART (Pendapatan vs Jumlah Transaksi)
+        // 1. DATA FOR SALES TREND CHART
         $salesTrend = DB::table('transaksi')
             ->where('id_cabang', $id)
             ->when($filter === 'minggu', function ($q) {

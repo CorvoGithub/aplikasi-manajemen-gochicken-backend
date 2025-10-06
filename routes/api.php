@@ -5,15 +5,14 @@ use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\BahanBakuController;
 use App\Http\Controllers\CabangController;
+use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\JenisPengeluaranController;
 use App\Http\Controllers\KaryawanController;
 use App\Http\Controllers\ManageAdminCabangController;
 use App\Http\Controllers\PengeluaranController;
 use App\Http\Controllers\ProdukController;
-use App\Http\Controllers\DashboardController;
-use App\Http\Controllers\TransaksiController;
 use App\Http\Controllers\ReportController;
-use App\Models\BahanBakuModel;
-
+use App\Http\Controllers\TransaksiController;
 
 // Public routes for authentication
 Route::post('/super-admin/login', [AuthController::class, 'loginSuperAdmin']);
@@ -22,76 +21,60 @@ Route::get('/cabang', [CabangController::class, 'index']);
 
 // Routes protected by Sanctum middleware
 Route::middleware('auth:sanctum')->group(function () {
-
-    // ==== Current authenticated user ====
-    Route::get('/user', function (Request $request) {
-        return $request->user();
-    });
-
-    // ==== Logout route ====
+    // Current authenticated user
+    Route::get('/user', fn(Request $request) => $request->user());
     Route::post('/logout', [AuthController::class, 'logout']);
 
-    // ==== Get data for dashboard as Admin Cabang ====
-    Route::get('/dashboard', [DashboardController::class, 'globalStats']);
+    // --- DASHBOARD & REPORTS (FOR ADMIN CABANG) ---
     Route::get('/dashboard/cabang/{id}', [DashboardController::class, 'cabangStats']);
     Route::get('/dashboard/cabang/{id}/chart', [DashboardController::class, 'cabangChart']);
     Route::get('/dashboard/user/activities', [DashboardController::class, 'userActivities']);
-
-    // ==== Get data for Reports as Admin Cabang (UNPAGINATED) ====
     Route::get('/reports/cabang/{id}', [ReportController::class, 'cabangReport']);
-    // Route::get('/reports/cabang/{id}/products', [ReportController::class, 'productReport']);
-    // Route::get('/reports/cabang/{id}/sales', [ReportController::class, 'salesReport']);
-    // Route::get('/reports/cabang/{id}/employees', [ReportController::class, 'employeeReport']);
-
-    // ==== Get data for Reports as Admin Cabang (PAGINATED) ====
     Route::get('/reports/cabang/{id}/products', [ReportController::class, 'productReportPaginated']);
     Route::get('/reports/cabang/{id}/sales/transactions', [ReportController::class, 'salesTransactionsPaginated']);
     Route::get('/reports/cabang/{id}/sales/expenses', [ReportController::class, 'salesExpensesPaginated']);
     Route::get('/reports/cabang/{id}/employees', [ReportController::class, 'employeeReportPaginated']);
 
-    // ==== Routes that can only be accessed by Super Admin ====
-    Route::middleware('role:super admin')->group(function () {
-        // Cabang Management API
-        Route::post('/cabang', [CabangController::class, 'store']);
-        Route::put('/cabang/{id_cabang}', [CabangController::class, 'update']);
-        Route::delete('/cabang/{id_cabang}', [CabangController::class, 'destroy']);
+    // --- FUNCTIONAL ROUTES FOR ADMIN CABANG ---
+    // Product & Stock
+    Route::get('/cabang/{id_cabang}/produk', [ProdukController::class, 'getProdukByCabang']);
+    Route::put('/stok-cabang/{id_stock_cabang}', [ProdukController::class, 'updateStok']);
 
-        // Admin Cabang Management API
+    // Karyawan
+    Route::get('/cabang/{id_cabang}/karyawan', [KaryawanController::class, 'getKaryawanByCabang']);
+    Route::post('/karyawan', [KaryawanController::class, 'store']);
+    Route::put('/karyawan/{id_karyawan}', [KaryawanController::class, 'update']);
+    Route::delete('/karyawan/{id_karyawan}', [KaryawanController::class, 'destroy']);
+    
+    // Pengeluaran
+    Route::get('/cabang/{id_cabang}/pengeluaran', [PengeluaranController::class, 'getPengeluaranByCabang']);
+    Route::post('/pengeluaran', [PengeluaranController::class, 'store']);
+    Route::put('/pengeluaran/{id_pengeluaran}', [PengeluaranController::class, 'update']);
+    Route::delete('/pengeluaran/{id_pengeluaran}', [PengeluaranController::class, 'destroy']);
+
+    // --- SHARED RESOURCES (Needed by Admin Cabang for forms) ---
+    Route::get('/jenis-pengeluaran', [JenisPengeluaranController::class, 'index']);
+    Route::post('/jenis-pengeluaran', [JenisPengeluaranController::class, 'store']);
+    Route::get('/bahan-baku', [BahanBakuController::class, 'index']); 
+
+    // --- SUPER ADMIN ONLY ROUTES ---
+    Route::middleware('role:super admin')->group(function () {
+        Route::get('/dashboard', [DashboardController::class, 'globalStats']);
+        
+        // Resource Management
+        Route::apiResource('/cabang', CabangController::class)->except(['index']);
+        Route::apiResource('/produk', ProdukController::class)->except(['getProdukByCabang', 'updateStok']);
+        Route::apiResource('/bahan-baku', BahanBakuController::class)->except(['index']);
+        Route::apiResource('/karyawan', KaryawanController::class)->except(['getKaryawanByCabang', 'store', 'update', 'destroy']);
+        Route::apiResource('/pengeluaran', PengeluaranController::class)->except(['getPengeluaranByCabang', 'store', 'update', 'destroy']);
+        Route::apiResource('/transaksi', TransaksiController::class)->except(['update']);
+
+        // Admin Cabang Management
         Route::get('/admin-cabang', [ManageAdminCabangController::class, 'listAdmin']);
         Route::get('/cabang-without-admin', [ManageAdminCabangController::class, 'getCabangWithoutAdmin']);
         Route::post('/create-admin-cabang', [ManageAdminCabangController::class, 'createAdminCabang']);
         Route::put('/admin-cabang/{id_user}', [ManageAdminCabangController::class, 'updateAdminCabang']);
         Route::delete('/admin-cabang/{id_user}', [ManageAdminCabangController::class, 'deleteAdminCabang']);
-
-        // Produk Management API
-        Route::get('/produk', [ProdukController::class, 'index']);
-        Route::post('/produk', [ProdukController::class, 'store']);
-        Route::put('/produk/{id_produk}', [ProdukController::class, 'update']);
-        Route::delete('/produk/{id_produk}', [ProdukController::class, 'destroy']);
-
-        // Bahan Baku Management API
-        Route::get('/bahan-baku', [BahanBakuController::class, 'index']);
-        Route::post('/bahan-baku', [BahanBakuController::class, 'store']);
-        Route::put('/bahan-baku/{id_bahan_baku}', [BahanBakuController::class, 'update']);
-        Route::delete('/bahan-baku/{id_bahan_baku}', [BahanBakuController::class, 'destroy']);
-
-        // Transaksi Management API
-        Route::get('/transaksi', [TransaksiController::class, 'index']);
-        Route::post('/transaksi', [TransaksiController::class, 'store']);
-        Route::get('/transaksi/{id_transaksi}', [TransaksiController::class, 'show']);
-        Route::delete('/transaksi/{id_transaksi}', [TransaksiController::class, 'destroy']);
-
-        // Karyawan Management API
-        Route::get('/karyawan', [KaryawanController::class, 'index']);
-        Route::post('/karyawan', [KaryawanController::class, 'store']);
-        Route::put('/karyawan/{id_karyawan}', [KaryawanController::class, 'update']);
-        Route::delete('/karyawan/{id_karyawan}', [KaryawanController::class, 'destroy']);
-
-        // Karyawan Management API
-        Route::get('/pengeluaran', [PengeluaranController::class, 'index']);
-        Route::post('/pengeluaran', [PengeluaranController::class, 'store']);
-        Route::put('/pengeluaran/{id_pengeluaran}', [PengeluaranController::class, 'update']);
-        Route::delete('/pengeluaran/{id_pengeluaran}', [PengeluaranController::class, 'destroy']);
     });
-
 });
+

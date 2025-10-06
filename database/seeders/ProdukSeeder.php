@@ -16,7 +16,7 @@ class ProdukSeeder extends Seeder
                 'harga' => 10000,
                 'kategori' => 'Ayam Goreng',
                 'id_stock_cabang' => 1,
-                'gambar_produk' => 'ayam_paha_bawah.jpg',
+                'gambar_produk' => 'ayam_paha_bawah.png',
             ],
             [
                 'nama_produk' => 'Ayam Goreng Paha Atas',
@@ -24,7 +24,7 @@ class ProdukSeeder extends Seeder
                 'harga' => 12000,
                 'kategori' => 'Ayam Goreng',
                 'id_stock_cabang' => 2,
-                'gambar_produk' => 'ayam_paha_atas.jpg',
+                'gambar_produk' => 'ayam_paha_atas.png',
             ],
             [
                 'nama_produk' => 'Ayam Goreng Dada',
@@ -32,7 +32,7 @@ class ProdukSeeder extends Seeder
                 'harga' => 15000,
                 'kategori' => 'Ayam Goreng',
                 'id_stock_cabang' => 3,
-                'gambar_produk' => 'ayam_dada.jpg',
+                'gambar_produk' => 'ayam_dada.png',
             ],
             [
                 'nama_produk' => 'Ayam Goreng Sayap',
@@ -40,7 +40,7 @@ class ProdukSeeder extends Seeder
                 'harga' => 9000,
                 'kategori' => 'Ayam Goreng',
                 'id_stock_cabang' => 4,
-                'gambar_produk' => 'ayam_sayap.jpg',
+                'gambar_produk' => 'ayam_sayap.png',
             ],
             [
                 'nama_produk' => 'Nasi Putih',
@@ -56,7 +56,7 @@ class ProdukSeeder extends Seeder
                 'harga' => 7000,
                 'kategori' => 'Add On',
                 'id_stock_cabang' => 6,
-                'gambar_produk' => 'kulit.jpg',
+                'gambar_produk' => 'kulit.png',
             ],
             [
                 'nama_produk' => 'Usus Crispy',
@@ -64,7 +64,7 @@ class ProdukSeeder extends Seeder
                 'harga' => 6000,
                 'kategori' => 'Add On',
                 'id_stock_cabang' => 7,
-                'gambar_produk' => 'usus.jpg',
+                'gambar_produk' => 'usus.png',
             ],
         ]);
     }
