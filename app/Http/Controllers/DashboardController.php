@@ -213,19 +213,16 @@ class DashboardController extends Controller
             ->selectRaw("DATE(tanggal_waktu) as tanggal, SUM(total_harga) as total")
             ->where('id_cabang', $id)
             ->when($filter === 'minggu', function ($q) {
-                // WAS: $q->whereBetween('created_at', ...
-                $q->whereBetween('tanggal_waktu', [ // NOW: Filter by the correct column
+                $q->whereBetween('tanggal_waktu', [
                     now()->startOfWeek(Carbon::SUNDAY), now()->endOfWeek(Carbon::SATURDAY)
                 ]);
             })
             ->when($filter === 'bulan', function ($q) {
-                // WAS: $q->whereYear('created_at', ...
-                $q->whereYear('tanggal_waktu', now()->year) // NOW: Filter by the correct column
+                $q->whereYear('tanggal_waktu', now()->year)
                     ->whereMonth('tanggal_waktu', now()->month);
             })
             ->when($filter === 'tahun', function ($q) {
-                // WAS: $q->whereYear('created_at', ...
-                $q->whereYear('tanggal_waktu', now()->year); // NOW: Filter by the correct column
+                $q->whereYear('tanggal_waktu', now()->year);
             })
             ->groupBy('tanggal')
             ->orderBy('tanggal')
@@ -233,23 +230,19 @@ class DashboardController extends Controller
 
         // Query pengeluaran
         $pengeluaran = DB::table('pengeluaran')
-            // This table uses 'tanggal', not 'tanggal_waktu'
             ->selectRaw("DATE(tanggal) as tanggal, SUM(jumlah) as total")
             ->where('id_cabang', $id)
             ->when($filter === 'minggu', function ($q) {
-                // WAS: $q->whereBetween('created_at', ...
-                $q->whereBetween('tanggal', [ // NOW: Filter by the correct column
+                $q->whereBetween('tanggal', [
                     now()->startOfWeek(Carbon::SUNDAY), now()->endOfWeek(Carbon::SATURDAY)
                 ]);
             })
             ->when($filter === 'bulan', function ($q) {
-                // WAS: $q->whereYear('created_at', ...
-                $q->whereYear('tanggal', now()->year) // NOW: Filter by the correct column
+                $q->whereYear('tanggal', now()->year)
                     ->whereMonth('tanggal', now()->month);
             })
             ->when($filter === 'tahun', function ($q) {
-                // WAS: $q->whereYear('created_at', ...
-                $q->whereYear('tanggal', now()->year); // NOW: Filter by the correct column
+                $q->whereYear('tanggal', now()->year);
             })
             ->groupBy('tanggal')
             ->orderBy('tanggal')
@@ -266,15 +259,10 @@ class DashboardController extends Controller
 
     public function userActivities(Request $request)
     {
-        // Get the authenticated user
         $user = $request->user();
 
-        // We only show activities for Admin Cabang. Super Admin's activities might be too broad.
         if ($user->role !== 'admin cabang') {
-            return response()->json([
-                'status' => 'success',
-                'data' => []
-            ]);
+            return response()->json(['status' => 'success', 'data' => [] ]);
         }
 
         $cabangId = $user->id_cabang;
@@ -283,18 +271,17 @@ class DashboardController extends Controller
 
         // Fetch recent karyawan (employees) added by this admin
         $karyawanActivities = KaryawanModel::where('id_cabang', $cabangId)
-        ->orderBy('created_at', 'desc')
-        ->take(5)
-        ->get()
-        ->map(function ($item) {
-            return [
-                'description' => "Tambah Karyawan baru: {$item->nama_karyawan}",
-                'timestamp' => Carbon::parse($item->created_at)->toISOString(),
-                'type' => 'add'
-            ];
-        });
+            ->orderBy('created_at', 'desc')
+            ->take(5)
+            ->get()
+            ->map(function ($item) {
+                return [
+                    'description' => "Tambah Karyawan baru: {$item->nama_karyawan}",
+                    'timestamp' => Carbon::parse($item->created_at)->toISOString(),
+                    'type' => 'add'
+                ];
+            });
 
-        // Fetch recent pengeluaran (expenses) by this admin's branch
         $pengeluaranActivities = PengeluaranModel::where('id_cabang', $cabangId)
         ->orderBy('created_at', 'desc')
         ->take(5)
@@ -319,13 +306,33 @@ class DashboardController extends Controller
                 'type' => 'update'
             ];
         });
+            ->orderBy('created_at', 'desc')
+            ->take(5)
+            ->get()
+            ->map(function ($item) {
+                return [
+                    'description' => "Pengeluaran Rp " . number_format($item->jumlah, 0, ',', '.') . " untuk {$item->keterangan}",
+                    'timestamp' => Carbon::parse($item->created_at)->toISOString(),
+                    'type' => 'expense'
+                ];
+            });
+        
+        $produkActivities = ProdukModel::where('id_stock_cabang', $cabangId) // This logic might need adjustment based on your schema
+            ->orderBy('created_at', 'desc')
+            ->take(5)
+            ->get()
+            ->map(function ($item) {
+                return [
+                    'description' => "Tambah/Update produk: {$item->nama_produk}",
+                    'timestamp' => Carbon::parse($item->created_at)->toISOString(),
+                    'type' => 'update'
+                ];
+            });
 
-        // Combine all activities into a single collection
         $allActivities = collect([])->concat($karyawanActivities)
-                                    ->concat($pengeluaranActivities)
-                                    ->concat($produkActivities);
+                                      ->concat($pengeluaranActivities)
+                                      ->concat($produkActivities);
 
-        // Sort the activities by timestamp in descending order and take the top 10
         $recentActivities = $allActivities->sortByDesc('timestamp')->take(10)->values()->all();
 
         return response()->json([

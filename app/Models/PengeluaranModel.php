@@ -2,8 +2,8 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Model;
 
 class PengeluaranModel extends Model
 {
@@ -11,25 +11,39 @@ class PengeluaranModel extends Model
 
     protected $table = 'pengeluaran';
     protected $primaryKey = 'id_pengeluaran';
-    public $incrementing = false;
+    public $timestamps = true;
 
     protected $fillable = [
-        'id_pengeluaran',
-        'id_detail_pengeluaran',
+        'id_cabang',
+        'id_jenis',
         'tanggal',
         'jumlah',
         'keterangan',
     ];
 
-    // Relasi ke jenis pengeluaran
+    /**
+     * ✨ FIX: Defines the relationship to the 'jenis_pengeluaran' table.
+     * This allows us to easily get the name of the expense type.
+     */
     public function jenisPengeluaran()
     {
-        return $this->belongsTo(JenisPengeluaranModel::class, 'id_jenis_pengeluaran');
+        return $this->belongsTo(JenisPengeluaranModel::class, 'id_jenis', 'id_jenis');
     }
 
-    // Relasi ke detail pengeluaran
-    public function detailPengeluaran()
+    /**
+     * ✨ FIX: Defines the relationship to the 'detail_pengeluaran' table.
+     * This allows us to get all the detail items for an expense.
+     */
+    public function details()
     {
         return $this->hasMany(DetailPengeluaranModel::class, 'id_pengeluaran', 'id_pengeluaran');
+    }
+
+    /**
+     * Relationship to Cabang (Branch)
+     */
+    public function cabang()
+    {
+        return $this->belongsTo(CabangModel::class, 'id_cabang', 'id_cabang');
     }
 }

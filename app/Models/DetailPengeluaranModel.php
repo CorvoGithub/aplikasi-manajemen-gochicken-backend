@@ -18,7 +18,7 @@ class DetailPengeluaranModel extends Model
         'id_pengeluaran',
         'id_bahan_baku',
         'id_cabang',
-        'id_jenis_pengeluaran',
+        'id_jenis',
         'id_karyawan',
         'jumlah_item',
         'harga_satuan',
