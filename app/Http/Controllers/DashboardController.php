@@ -16,31 +16,12 @@ class DashboardController extends Controller
     // Statistik per-cabang
     public function cabangStats($id)
     {
-        // total produk pada stok_cabang untuk cabang ini
-        $totalProduk = DB::table('stok_cabang')
-            ->where('id_cabang', $id)
-            ->count();
-
-        // produk yang stoknya > 0
-        $tersedia = DB::table('stok_cabang')
-            ->where('id_cabang', $id)
-            ->where('jumlah_stok', '>', 0)
-            ->count();
-
-        // transaksi hari ini (tanggal server)
-        $todayCount = DB::table('transaksi')
-            ->whereDate('tanggal_waktu', Carbon::today())
-            ->where('id_cabang', $id)
-            ->count();
-
-        // pendapatan bulan ini
-        $revenueMonth = DB::table('transaksi')
-            ->whereYear('tanggal_waktu', Carbon::now()->year)
-            ->whereMonth('tanggal_waktu', Carbon::now()->month)
-            ->where('id_cabang', $id)
-            ->sum('total_harga');
-
-        // produk terlaris (gabungan detail_transaksi + transaksi untuk membatasi cabang)
+        // Data for top summary cards
+        $totalProduk = DB::table('stok_cabang')->where('id_cabang', $id)->count();
+        $tersedia = DB::table('stok_cabang')->where('id_cabang', $id)->where('jumlah_stok', '>', 0)->count();
+        $todayCount = DB::table('transaksi')->whereDate('tanggal_waktu', Carbon::today())->where('id_cabang', $id)->count();
+        $revenueMonth = DB::table('transaksi')->whereYear('tanggal_waktu', Carbon::now()->year)->whereMonth('tanggal_waktu', Carbon::now()->month)->where('id_cabang', $id)->sum('total_harga');
+        
         $top = DB::table('detail_transaksi')
             ->join('transaksi', 'detail_transaksi.id_transaksi', '=', 'transaksi.id_transaksi')
             ->where('transaksi.id_cabang', $id)
@@ -55,14 +36,42 @@ class DashboardController extends Controller
             $topProductName = $prod ? $prod->nama_produk : null;
         }
 
+        // Data for Daily Financial Summary widget
+        $pendapatanHariIni = DB::table('transaksi')
+            ->where('id_cabang', $id)
+            ->whereDate('tanggal_waktu', Carbon::today())
+            ->sum('total_harga');
+
+        $pengeluaranHariIni = DB::table('pengeluaran')
+            ->where('id_cabang', $id)
+            ->whereDate('tanggal', Carbon::today())
+            ->sum('jumlah');
+            
+        $estimasiLaba = $pendapatanHariIni - $pengeluaranHariIni;
+        
+        // ✨ NEW: Query for revenue breakdown by payment method for today
+        $revenueBreakdown = DB::table('transaksi')
+            ->where('id_cabang', $id)
+            ->whereDate('tanggal_waktu', Carbon::today())
+            ->select('metode_pembayaran', DB::raw('SUM(total_harga) as total'))
+            ->groupBy('metode_pembayaran')
+            ->get();
+
         return response()->json([
             'status' => 'success',
             'data' => [
+                // Old data for top cards
                 'total_produk' => (int) $totalProduk,
                 'produk_tersedia' => (int) $tersedia,
                 'transactions_today' => (int) $todayCount,
                 'revenue_month' => (float) $revenueMonth,
                 'top_product' => $topProductName,
+                // Data for daily summary
+                'pendapatan_hari_ini' => (float) $pendapatanHariIni,
+                'pengeluaran_hari_ini' => (float) $pengeluaranHariIni,
+                'estimasi_laba' => (float) $estimasiLaba,
+                // ✨ New data added to the response
+                'revenue_breakdown' => $revenueBreakdown,
             ],
         ]);
     }
