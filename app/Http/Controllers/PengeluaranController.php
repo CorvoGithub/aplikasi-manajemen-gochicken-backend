@@ -51,12 +51,23 @@ class PengeluaranController extends Controller
 
         DB::beginTransaction();
         try {
+            // Hitung jumlah hari dalam bulan dari tanggal pengeluaran
+            $jumlah_hari_bulan_ini = cal_days_in_month(
+                CAL_GREGORIAN,
+                date('m', strtotime($request->tanggal)),
+                date('Y', strtotime($request->tanggal))
+            );
+
+            // Hitung cicilan harian otomatis
+            $cicilan_harian = $request->jumlah / $jumlah_hari_bulan_ini;
+
             $pengeluaran = PengeluaranModel::create([
                 'id_cabang' => $request->id_cabang,
                 'id_jenis' => $request->id_jenis,
                 'tanggal' => $request->tanggal,
                 'jumlah' => $request->jumlah,
                 'keterangan' => $request->keterangan,
+                'cicilan_harian' => $cicilan_harian, // <── tambahkan ini
             ]);
 
             if ($request->has('details') && is_array($request->details)) {
@@ -97,15 +108,30 @@ class PengeluaranController extends Controller
         if ($validator->fails()) {
             return response()->json(['status' => 'error', 'message' => 'Validasi gagal.', 'errors' => $validator->errors()], 422);
         }
-        
+
         $pengeluaran = PengeluaranModel::find($id_pengeluaran);
         if (!$pengeluaran) {
             return response()->json(['status' => 'error', 'message' => 'Pengeluaran tidak ditemukan'], 404);
         }
-        
+
         DB::beginTransaction();
         try {
-            $pengeluaran->update($request->only(['id_jenis', 'tanggal', 'jumlah', 'keterangan']));
+             // Rehitung cicilan_harian ketika nominal diubah
+            $jumlah_hari_bulan_ini = cal_days_in_month(
+                CAL_GREGORIAN,
+                date('m', strtotime($request->tanggal)),
+                date('Y', strtotime($request->tanggal))
+            );
+
+            $cicilan_harian = $request->jumlah / $jumlah_hari_bulan_ini;
+
+            $pengeluaran->update([
+                'id_jenis' => $request->id_jenis,
+                'tanggal' => $request->tanggal,
+                'jumlah' => $request->jumlah,
+                'keterangan' => $request->keterangan,
+                'cicilan_harian' => $cicilan_harian, // <── update otomatis juga
+            ]);
 
             DetailPengeluaranModel::where('id_pengeluaran', $id_pengeluaran)->delete();
 

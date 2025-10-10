@@ -32,6 +32,7 @@ class TransaksiController extends Controller
         $validator = Validator::make($request->all(), [
             'nama_pelanggan'     => 'nullable',
             'metode_pembayaran'  => 'required',
+            'status_transaksi'   => 'required',
             'id_cabang'          => 'required',
             'items'              => 'required',
             'items.*.id_produk'  => 'required',
@@ -66,6 +67,7 @@ class TransaksiController extends Controller
                 'tanggal_waktu'    => now(),
                 'total_harga'      => $totalHarga,
                 'metode_pembayaran'=> $request->metode_pembayaran,
+                'status_transaksi' => $request->status_transaksi,
                 'nama_pelanggan'   => $request->nama_pelanggan,
                 'id_cabang'        => $request->id_cabang,
             ]);

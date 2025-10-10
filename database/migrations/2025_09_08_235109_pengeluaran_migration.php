@@ -17,6 +17,7 @@ return new class extends Migration
             $table->integer('id_jenis');
             $table->date('tanggal');
             $table->decimal('jumlah', 15, 2);
+            $table->string('cicilan_harian')->nullable();
             $table->string('keterangan')->nullable();
             $table->timestamps();
         });

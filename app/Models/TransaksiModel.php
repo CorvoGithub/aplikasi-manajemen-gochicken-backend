@@ -19,6 +19,7 @@ class TransaksiModel extends Model
         'tanggal_waktu',
         'total_harga',
         'metode_pembayaran',
+        'status_transaksi',
         'nama_pelanggan',
         'id_cabang',
     ];
