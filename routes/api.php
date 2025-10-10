@@ -96,7 +96,14 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::apiResource('/bahan-baku', BahanBakuController::class)->except(['index']);
         Route::apiResource('/karyawan', KaryawanController::class)->except(['getKaryawanByCabang', 'store', 'update', 'destroy']);
         Route::apiResource('/pengeluaran', PengeluaranController::class)->except(['getPengeluaranByCabang', 'store', 'update', 'destroy']);
+        
+        // Transaksi & Laporan Transaksi
         Route::apiResource('/transaksi', TransaksiController::class)->except(['update']);
+        
+        // >>> ROUTE BARU UNTUK REPORT TRANSAKSI <<<
+        Route::get('/transaksi/report/pdf/{id_transaksi}', [TransaksiController::class, 'printPDF']);
+        Route::get('/transaksi/report/excel/{id_transaksi}', [TransaksiController::class, 'exportExcel']);
+        // >>> AKHIR ROUTE BARU <<<
 
         // Admin Cabang Management
         Route::get('/admin-cabang', [ManageAdminCabangController::class, 'listAdmin']);
@@ -106,4 +113,3 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::delete('/admin-cabang/{id_user}', [ManageAdminCabangController::class, 'deleteAdminCabang']);
     });
 });
-

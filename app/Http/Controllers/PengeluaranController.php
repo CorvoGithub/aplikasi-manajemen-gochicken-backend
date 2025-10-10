@@ -11,34 +11,38 @@ use Exception;
 
 class PengeluaranController extends Controller
 {
-    /**
-     * Get expenses for a specific branch.
-     */
+    public function index()
+    {
+        try {
+            $data = PengeluaranModel::with(['jenisPengeluaran', 'details.bahanBaku'])->get();
+            return response()->json(['status' => 'success', 'data' => $data]);
+        } catch (Exception $e) {
+            return response()->json(['status' => 'error', 'message' => $e->getMessage()], 500);
+        }
+    }
+
     public function getPengeluaranByCabang($id_cabang)
     {
         try {
             $pengeluaran = PengeluaranModel::where('id_cabang', $id_cabang)
-                ->with(['jenisPengeluaran', 'details.bahanBaku']) // Eager load relationships
+                ->with(['jenisPengeluaran', 'details.bahanBaku'])
                 ->orderBy('tanggal', 'desc')
                 ->get();
 
             return response()->json(['status' => 'success', 'data' => $pengeluaran]);
         } catch (Exception $e) {
-            return response()->json(['status' => 'error', 'message' => 'Gagal mengambil data pengeluaran: ' . $e->getMessage()], 500);
+            return response()->json(['status' => 'error', 'message' => 'Gagal mengambil data: ' . $e->getMessage()], 500);
         }
     }
 
-    /**
-     * Store a new expense and its details.
-     */
     public function store(Request $request)
     {
         $validator = Validator::make($request->all(), [
             'id_cabang' => 'required|exists:cabang,id_cabang',
             'id_jenis' => 'required|exists:jenis_pengeluaran,id_jenis',
             'tanggal' => 'required|date',
-            'jumlah' => 'required|numeric',
-            'keterangan' => 'required|string',
+            'jumlah' => 'required|numeric|min:0',
+            'keterangan' => 'required|string|max:255',
             'details' => 'nullable|array',
             'details.*.id_bahan_baku' => 'required_with:details|exists:bahan_baku,id_bahan_baku',
             'details.*.jumlah_item' => 'required_with:details|numeric|min:1',
@@ -46,10 +50,15 @@ class PengeluaranController extends Controller
         ]);
 
         if ($validator->fails()) {
-            return response()->json(['status' => 'error', 'message' => 'Validasi gagal.', 'errors' => $validator->errors()], 422);
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Validasi gagal.',
+                'errors' => $validator->errors(),
+            ], 422);
         }
 
         DB::beginTransaction();
+
         try {
             // Hitung jumlah hari dalam bulan dari tanggal pengeluaran
             $jumlah_hari_bulan_ini = cal_days_in_month(
@@ -70,16 +79,15 @@ class PengeluaranController extends Controller
                 'cicilan_harian' => $cicilan_harian, // <── tambahkan ini
             ]);
 
-            if ($request->has('details') && is_array($request->details)) {
-                foreach ($request->details as $detailData) {
+            if (!empty($request->details)) {
+                foreach ($request->details as $detail) {
                     DetailPengeluaranModel::create([
                         'id_pengeluaran' => $pengeluaran->id_pengeluaran,
-                        // ✨ PERBAIKAN: Menambahkan 'id_jenis' yang wajib diisi ke dalam payload detail
                         'id_jenis' => $request->id_jenis,
-                        'id_bahan_baku' => $detailData['id_bahan_baku'],
-                        'jumlah_item' => $detailData['jumlah_item'],
-                        'harga_satuan' => $detailData['harga_satuan'],
-                        'total_harga' => $detailData['jumlah_item'] * $detailData['harga_satuan'],
+                        'id_bahan_baku' => $detail['id_bahan_baku'],
+                        'jumlah_item' => $detail['jumlah_item'],
+                        'harga_satuan' => $detail['harga_satuan'],
+                        'total_harga' => $detail['jumlah_item'] * $detail['harga_satuan'],
                     ]);
                 }
             }
@@ -92,16 +100,13 @@ class PengeluaranController extends Controller
         }
     }
 
-    /**
-     * ✨ REVISED: Update an existing expense and its details.
-     */
     public function update(Request $request, $id_pengeluaran)
     {
         $validator = Validator::make($request->all(), [
             'id_jenis' => 'required|exists:jenis_pengeluaran,id_jenis',
             'tanggal' => 'required|date',
-            'jumlah' => 'required|numeric',
-            'keterangan' => 'required|string',
+            'jumlah' => 'required|numeric|min:0',
+            'keterangan' => 'required|string|max:255',
             'details' => 'nullable|array',
         ]);
 
@@ -111,7 +116,7 @@ class PengeluaranController extends Controller
 
         $pengeluaran = PengeluaranModel::find($id_pengeluaran);
         if (!$pengeluaran) {
-            return response()->json(['status' => 'error', 'message' => 'Pengeluaran tidak ditemukan'], 404);
+            return response()->json(['status' => 'error', 'message' => 'Pengeluaran tidak ditemukan.'], 404);
         }
 
         DB::beginTransaction();
@@ -135,40 +140,35 @@ class PengeluaranController extends Controller
 
             DetailPengeluaranModel::where('id_pengeluaran', $id_pengeluaran)->delete();
 
-            if ($request->has('details') && is_array($request->details)) {
-                foreach ($request->details as $detailData) {
+            if (!empty($request->details)) {
+                foreach ($request->details as $detail) {
                     DetailPengeluaranModel::create([
                         'id_pengeluaran' => $pengeluaran->id_pengeluaran,
-                        // ✨ PERBAIKAN: Juga menambahkan 'id_jenis' saat mengupdate
                         'id_jenis' => $request->id_jenis,
-                        'id_bahan_baku' => $detailData['id_bahan_baku'],
-                        'jumlah_item' => $detailData['jumlah_item'],
-                        'harga_satuan' => $detailData['harga_satuan'],
-                        'total_harga' => $detailData['jumlah_item'] * $detailData['harga_satuan'],
+                        'id_bahan_baku' => $detail['id_bahan_baku'],
+                        'jumlah_item' => $detail['jumlah_item'],
+                        'harga_satuan' => $detail['harga_satuan'],
+                        'total_harga' => $detail['jumlah_item'] * $detail['harga_satuan'],
                     ]);
                 }
             }
 
             DB::commit();
-            return response()->json(['status' => 'success', 'message' => 'Pengeluaran berhasil diupdate.']);
+            return response()->json(['status' => 'success', 'message' => 'Pengeluaran berhasil diperbarui.']);
         } catch (Exception $e) {
             DB::rollBack();
-            return response()->json(['status' => 'error', 'message' => 'Gagal mengupdate pengeluaran: ' . $e->getMessage()], 500);
+            return response()->json(['status' => 'error', 'message' => 'Gagal memperbarui: ' . $e->getMessage()], 500);
         }
     }
 
-    /**
-     * Delete an expense.
-     */
     public function destroy($id_pengeluaran)
     {
         $pengeluaran = PengeluaranModel::find($id_pengeluaran);
         if (!$pengeluaran) {
-            return response()->json(['status' => 'error', 'message' => 'Pengeluaran tidak ditemukan'], 404);
+            return response()->json(['status' => 'error', 'message' => 'Pengeluaran tidak ditemukan.'], 404);
         }
-        // Deleting the main expense should cascade to details if the foreign key is set up correctly
+
         $pengeluaran->delete();
         return response()->json(['status' => 'success', 'message' => 'Pengeluaran berhasil dihapus.']);
     }
 }
-
