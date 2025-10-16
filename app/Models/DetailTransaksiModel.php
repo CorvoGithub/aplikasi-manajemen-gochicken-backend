@@ -10,11 +10,11 @@ class DetailTransaksiModel extends Model
     use HasFactory;
 
     protected $table = 'detail_transaksi';
-    protected $primaryKey = 'id_detail_transaksi';
+    protected $primaryKey = 'id_detail';
     public $incrementing = false;
 
     protected $fillable = [
-        'id_detail_transaksi',
+        'id_detail',
         'id_transaksi',
         'id_produk',
         'jumlah_produk',

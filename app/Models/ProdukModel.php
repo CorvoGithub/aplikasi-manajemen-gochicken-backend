@@ -11,16 +11,15 @@ class ProdukModel extends Model
 
     protected $table = 'produk';
     protected $primaryKey = 'id_produk';
-    
-    // This is the main fix. 'id_produk' is an auto-incrementing key, so this must be true.
+
     public $incrementing = true;
-    
+
     protected $fillable = [
         'nama_produk',
         'kategori',
         'deskripsi',
         'harga',
-        'id_stock_cabang', // <-- This is the column name for the foreign key
+        'id_stock_cabang',
         'gambar_produk',
     ];
     protected $appends = ['gambar_produk_url'];

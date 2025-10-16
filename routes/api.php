@@ -84,6 +84,9 @@ Route::middleware('auth:sanctum')->group(function () {
     // --- SHARED RESOURCES (Needed by Admin Cabang for forms) ---
     Route::get('/jenis-pengeluaran', [JenisPengeluaranController::class, 'index']);
     Route::post('/jenis-pengeluaran', [JenisPengeluaranController::class, 'store']);
+    Route::put('/jenis-pengeluaran/{id_jenis}', [JenisPengeluaranController::class, 'update']);
+    Route::delete('/jenis-pengeluaran/{id_jenis}', [JenisPengeluaranController::class, 'destroy']);
+
     Route::get('/bahan-baku', [BahanBakuController::class, 'index']);
 
     // --- SUPER ADMIN ONLY ROUTES ---
@@ -96,10 +99,10 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::apiResource('/bahan-baku', BahanBakuController::class)->except(['index']);
         Route::apiResource('/karyawan', KaryawanController::class)->except(['getKaryawanByCabang', 'store', 'update', 'destroy']);
         Route::apiResource('/pengeluaran', PengeluaranController::class)->except(['getPengeluaranByCabang', 'store', 'update', 'destroy']);
-        
+
         // Transaksi & Laporan Transaksi
         Route::apiResource('/transaksi', TransaksiController::class)->except(['update']);
-        
+
         // >>> ROUTE BARU UNTUK REPORT TRANSAKSI <<<
         Route::get('/transaksi/report/pdf/{id_transaksi}', [TransaksiController::class, 'printPDF']);
         Route::get('/transaksi/report/excel/{id_transaksi}', [TransaksiController::class, 'exportExcel']);

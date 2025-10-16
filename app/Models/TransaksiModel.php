@@ -36,15 +36,9 @@ class TransaksiModel extends Model
         return $this->belongsTo(CabangModel::class, 'id_cabang');
     }
 
-    // Relasi ke Produk
-    public function produk()
-    {
-        return $this->belongsTo(ProdukModel::class, 'id_produk');
-    }
-
     // Relasi ke Detail Transaksi (kalau ada tabel detail transaksi)
     public function detail()
     {
-        return $this->belongsTo(DetailTransaksiModel::class, 'id_detail_transaksi');
+        return $this->hasMany(DetailTransaksiModel::class, 'id_transaksi');
     }
 }
