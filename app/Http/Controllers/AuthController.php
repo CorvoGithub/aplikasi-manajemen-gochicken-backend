@@ -77,4 +77,40 @@ class AuthController extends Controller
         ]);
     }
 
+    /**
+     * ✨ FUNGSI BARU: Untuk login kasir dari aplikasi mobile.
+     * Hanya memvalidasi ID cabang dan password cabang.
+     */
+    public function loginKasir(Request $request)
+    {
+        $request->validate([
+            'id_cabang' => 'required|exists:cabang,id_cabang',
+            'password_cabang' => 'required',
+        ]);
+
+        $cabang = CabangModel::find($request->id_cabang);
+
+        // Validasi password cabang yang di-hash
+        if (!$cabang || !Hash::check($request->password_cabang, $cabang->password_cabang)) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Kombinasi cabang dan password tidak valid.',
+            ], 401);
+        }
+        
+        // Buat token sederhana untuk kasir. Token ini bisa memiliki permission terbatas.
+        // Kita gunakan model Cabang untuk membuat token agar tidak tercampur dengan user admin.
+        $token = $cabang->createToken('kasir-token', ['role:kasir'])->plainTextToken;
+
+        return response()->json([
+            'status' => 'success',
+            'message' => 'Login berhasil!',
+            'token' => $token,
+            'cabang' => [
+                'id_cabang' => $cabang->id_cabang,
+                'nama_cabang' => $cabang->nama_cabang,
+            ]
+        ]);
+    }
+
 }

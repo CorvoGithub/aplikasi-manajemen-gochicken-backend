@@ -11,10 +11,10 @@ class TransaksiModel extends Model
 
     protected $table = 'transaksi';
     protected $primaryKey = 'id_transaksi';
-    public $incrementing = false;
+    public $incrementing = true;
 
     protected $fillable = [
-        'id_transaksi',
+        // 'id_transaksi',
         'kode_transaksi',
         'tanggal_waktu',
         'total_harga',
@@ -46,5 +46,16 @@ class TransaksiModel extends Model
     public function detail()
     {
         return $this->belongsTo(DetailTransaksiModel::class, 'id_detail_transaksi');
+    }
+
+    /**
+     * ✨ PERBAIKAN: Menambahkan relasi 'details' (plural) yang benar.
+     * Ini adalah fungsi baru yang dibutuhkan oleh PemesananController.
+     * Tipe relasinya adalah hasMany, yang berarti "satu transaksi memiliki banyak detail".
+     * Fungsi `detail()` Anda yang lama tidak akan tersentuh sama sekali.
+     */
+    public function details()
+    {
+        return $this->hasMany(DetailTransaksiModel::class, 'id_transaksi', 'id_transaksi');
     }
 }

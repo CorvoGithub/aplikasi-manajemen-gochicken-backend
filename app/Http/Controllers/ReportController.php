@@ -8,66 +8,70 @@ use Carbon\Carbon;
 
 class ReportController extends Controller
 {
+
+    private function applyTimeFilter($query, $filter, $dateColumn)
+    {
+        return $query->when($filter === 'minggu', function ($q) use ($dateColumn) {
+            $q->whereBetween($dateColumn, [now()->startOfWeek(Carbon::SUNDAY), now()->endOfWeek(Carbon::SATURDAY)]);
+        })->when($filter === 'bulan', function ($q) use ($dateColumn) {
+            $q->whereMonth($dateColumn, now()->month)->whereYear($dateColumn, now()->year);
+        })->when($filter === 'tahun', function ($q) use ($dateColumn) {
+            $q->whereYear($dateColumn, now()->year);
+        });
+    }
+
     /**
      * Fetch all reports for the dashboard of a specific branch.
      */
     public function cabangReport(Request $request, $id)
     {
-        $filter = $request->query('filter', 'bulan'); // default 'bulan'
+        $filter = $request->query('filter', 'bulan');
 
-        // 1. DATA FOR SALES TREND CHART
-        $salesTrend = DB::table('transaksi')
-            ->where('id_cabang', $id)
-            ->when($filter === 'minggu', function ($q) {
-                $q->whereBetween('tanggal_waktu', [now()->startOfWeek(Carbon::SUNDAY), now()->endOfWeek(Carbon::SATURDAY)])
-                    ->select(
-                        DB::raw('DAYNAME(tanggal_waktu) as period'),
-                        DB::raw('SUM(total_harga) as total_pendapatan'),
-                        DB::raw('COUNT(id_transaksi) as jumlah_transaksi')
-                    )
-                    ->groupBy('period')
-                    ->orderBy(DB::raw('DAYOFWEEK(tanggal_waktu)'));
-            })
-            ->when($filter === 'bulan', function ($q) {
-                $q->whereMonth('tanggal_waktu', now()->month)->whereYear('tanggal_waktu', now()->year)
-                    ->select(
-                        DB::raw("CONCAT('Minggu ', WEEK(tanggal_waktu, 5) - WEEK(DATE_FORMAT(tanggal_waktu, '%Y-%m-01'), 5) + 1) as period"),
-                        DB::raw('SUM(total_harga) as total_pendapatan'),
-                        DB::raw('COUNT(id_transaksi) as jumlah_transaksi')
-                    )
-                    ->groupBy('period')
-                    ->orderBy('period');
-            })
-            ->when($filter === 'tahun', function ($q) {
-                $q->whereYear('tanggal_waktu', now()->year)
-                    ->select(
-                        DB::raw('MONTHNAME(tanggal_waktu) as period'),
-                        DB::raw('SUM(total_harga) as total_pendapatan'),
-                        DB::raw('COUNT(id_transaksi) as jumlah_transaksi')
-                    )
-                    ->groupBy('period')
-                    ->orderBy(DB::raw('MONTH(tanggal_waktu)'));
-            })
+        // ✨ PERBAIKAN: Memastikan 'select' konsisten untuk semua filter
+        $salesTrendQuery = DB::table('transaksi')->where('id_cabang', $id);
+        
+        $periodSelector = match($filter) {
+            'minggu' => DB::raw('DAYNAME(tanggal_waktu) as period'),
+            'bulan' => DB::raw("CONCAT('Minggu ', WEEK(tanggal_waktu, 5) - WEEK(DATE_FORMAT(tanggal_waktu, '%Y-%m-01'), 5) + 1) as period"),
+            'tahun' => DB::raw('MONTHNAME(tanggal_waktu) as period'),
+            default => DB::raw('DATE(tanggal_waktu) as period'),
+        };
+
+        $orderSelector = match($filter) {
+            'minggu' => DB::raw('DAYOFWEEK(tanggal_waktu)'),
+            'bulan' => 'period',
+            'tahun' => DB::raw('MONTH(tanggal_waktu)'),
+            default => 'period',
+        };
+
+        $salesTrend = $this->applyTimeFilter($salesTrendQuery, $filter, 'tanggal_waktu')
+            ->select($periodSelector, DB::raw('SUM(total_harga) as total_pendapatan'), DB::raw('COUNT(id_transaksi) as jumlah_transaksi'))
+            ->groupBy('period')
+            ->orderBy($orderSelector)
             ->get();
 
-        // 2. DATA FOR TOP 5 PRODUCTS CHART
-        $topProducts = DB::table('detail_transaksi')
+        // Data Produk Terlaris (dengan filter)
+        $topProductsQuery = DB::table('detail_transaksi')
             ->join('transaksi', 'detail_transaksi.id_transaksi', '=', 'transaksi.id_transaksi')
             ->join('produk', 'detail_transaksi.id_produk', '=', 'produk.id_produk')
-            ->where('transaksi.id_cabang', $id)
+            ->where('transaksi.id_cabang', $id);
+        $topProducts = $this->applyTimeFilter($topProductsQuery, $filter, 'transaksi.tanggal_waktu')
             ->select('produk.nama_produk', DB::raw('SUM(detail_transaksi.jumlah_produk) as total_terjual'))
             ->groupBy('produk.nama_produk')
             ->orderByDesc('total_terjual')
             ->limit(5)
             ->get();
-
-        // 3. DATA FOR SUMMARY CARDS
-        $totalPendapatan = DB::table('transaksi')->where('id_cabang', $id)->sum('total_harga');
-        $totalTransaksi = DB::table('transaksi')->where('id_cabang', $id)->count();
+        
+        // Data Kartu Ringkasan (dengan filter)
+        $summaryQuery = DB::table('transaksi')->where('id_cabang', $id);
+        $filteredSummaryQuery = $this->applyTimeFilter(clone $summaryQuery, $filter, 'tanggal_waktu');
+        
+        $totalPendapatan = (float) $filteredSummaryQuery->sum('total_harga');
+        $totalTransaksi = (int) $filteredSummaryQuery->count();
         $avgTransaksi = $totalTransaksi > 0 ? $totalPendapatan / $totalTransaksi : 0;
-
-        $busiestDay = DB::table('transaksi')
-            ->where('id_cabang', $id)
+        
+        $busiestDayQuery = DB::table('transaksi')->where('id_cabang', $id);
+        $busiestDay = $this->applyTimeFilter($busiestDayQuery, $filter, 'tanggal_waktu')
             ->select(DB::raw('DAYNAME(tanggal_waktu) as day'), DB::raw('COUNT(*) as count'))
             ->groupBy('day')
             ->orderByDesc('count')
@@ -79,15 +83,17 @@ class ReportController extends Controller
                 'salesTrend' => $salesTrend,
                 'topProducts' => $topProducts,
                 'summary' => [
-                    'totalPendapatan' => (float)$totalPendapatan,
-                    'totalTransaksi' => (int)$totalTransaksi,
-                    'avgTransaksi' => (float)$avgTransaksi,
+                    'totalPendapatan' => $totalPendapatan,
+                    'totalTransaksi' => $totalTransaksi,
+                    'avgTransaksi' => $avgTransaksi,
                     'produkTerlaris' => $topProducts->first() ? $topProducts->first()->nama_produk : 'N/A',
                     'hariTersibuk' => $busiestDay ? $busiestDay->day : 'N/A',
                 ]
             ]
         ]);
     }
+
+    
 
     /**
      * Fetch all reports across all branches for Super Admin dashboard.
@@ -231,13 +237,9 @@ class ReportController extends Controller
             ->select('p.nama_produk', 'p.kategori', 'p.harga', 'sc.jumlah_stok')
             ->orderBy('p.nama_produk')
             ->paginate($request->get('limit', 10));
-
         return response()->json($products);
     }
-
-    /**
-     * Fetch paginated list of employees for a specific branch.
-     */
+    
     public function employeeReportPaginated(Request $request, $id)
     {
         $karyawan = DB::table('karyawan')
@@ -245,36 +247,29 @@ class ReportController extends Controller
             ->select('nama_karyawan', 'alamat', 'telepon', 'gaji')
             ->orderBy('nama_karyawan')
             ->paginate($request->get('limit', 10));
-
         return response()->json($karyawan);
     }
 
-    /**
-     * Fetch paginated list of sales transactions for a specific branch.
-     */
     public function salesTransactionsPaginated(Request $request, $id)
     {
-        $transaksi = DB::table('transaksi')
-            ->where('id_cabang', $id)
+        $filter = $request->query('filter', 'bulan');
+        $query = DB::table('transaksi')->where('id_cabang', $id);
+        $transaksi = $this->applyTimeFilter($query, $filter, 'tanggal_waktu')
             ->select('kode_transaksi', 'tanggal_waktu', 'metode_pembayaran', 'total_harga')
             ->orderByDesc('tanggal_waktu')
             ->paginate($request->get('limit', 10));
-
         return response()->json($transaksi);
     }
 
-    /**
-     * Fetch paginated list of expenses for a specific branch.
-     */
     public function salesExpensesPaginated(Request $request, $id)
     {
-        $pengeluaran = DB::table('pengeluaran as p')
+        $filter = $request->query('filter', 'bulan');
+        $query = DB::table('pengeluaran as p')->where('id_cabang', $id);
+        $pengeluaran = $this->applyTimeFilter($query, $filter, 'p.tanggal')
             ->join('jenis_pengeluaran as jp', 'p.id_jenis', '=', 'jp.id_jenis')
-            ->where('id_cabang', $id)
             ->select('p.tanggal', 'jp.jenis_pengeluaran as jenis', 'p.jumlah', 'p.keterangan')
             ->orderByDesc('p.tanggal')
             ->paginate($request->get('limit', 10));
-
         return response()->json($pengeluaran);
     }
 }
