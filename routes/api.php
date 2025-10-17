@@ -63,6 +63,9 @@ Route::middleware('auth:sanctum')->group(function () {
     // --- SUMBER DAYA BERSAMA (Dibutuhkan oleh Admin Cabang untuk form) ---
     Route::get('/jenis-pengeluaran', [JenisPengeluaranController::class, 'index']);
     Route::post('/jenis-pengeluaran', [JenisPengeluaranController::class, 'store']);
+    Route::put('/jenis-pengeluaran/{id_jenis}', [JenisPengeluaranController::class, 'update']);
+    Route::delete('/jenis-pengeluaran/{id_jenis}', [JenisPengeluaranController::class, 'destroy']);
+
     Route::get('/bahan-baku', [BahanBakuController::class, 'index']); 
 
     // --- HANYA UNTUK SUPER ADMIN ---

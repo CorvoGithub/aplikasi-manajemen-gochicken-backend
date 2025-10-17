@@ -177,7 +177,15 @@ class ReportController extends Controller
     {
         $products = DB::table('produk as p')
             ->join('stok_cabang as sc', 'p.id_produk', '=', 'sc.id_produk')
-            ->select('p.nama_produk', 'p.kategori', 'p.harga', 'sc.jumlah_stok')
+            ->join('cabang as c', 'sc.id_cabang', '=', 'c.id_cabang')
+            ->select(
+                'p.nama_produk',
+                'p.kategori',
+                'c.nama_cabang as cabang',
+                'p.harga',
+                'sc.jumlah_stok'
+            )
+            ->select('p.nama_produk', 'p.kategori', 'c.nama_cabang as cabang', 'p.harga', 'sc.jumlah_stok')
             ->orderBy('p.nama_produk')
             ->paginate($request->get('limit', 10));
 
@@ -233,6 +241,7 @@ class ReportController extends Controller
     {
         $products = DB::table('produk as p')
             ->join('stok_cabang as sc', 'p.id_produk', '=', 'sc.id_produk')
+
             ->where('sc.id_cabang', $id)
             ->select('p.nama_produk', 'p.kategori', 'p.harga', 'sc.jumlah_stok')
             ->orderBy('p.nama_produk')

@@ -14,7 +14,7 @@ class PengeluaranController extends Controller
     public function index()
     {
         try {
-            $data = PengeluaranModel::with(['jenisPengeluaran', 'details.bahanBaku'])->get();
+            $data = PengeluaranModel::with(['jenisPengeluaran', 'details.bahanBaku', 'cabang'])->get();
             return response()->json(['status' => 'success', 'data' => $data]);
         } catch (Exception $e) {
             return response()->json(['status' => 'error', 'message' => $e->getMessage()], 500);
@@ -25,7 +25,7 @@ class PengeluaranController extends Controller
     {
         try {
             $pengeluaran = PengeluaranModel::where('id_cabang', $id_cabang)
-                ->with(['jenisPengeluaran', 'details.bahanBaku'])
+                ->with(['jenisPengeluaran', 'details.bahanBaku', 'cabang'])
                 ->orderBy('tanggal', 'desc')
                 ->get();
 
@@ -39,10 +39,11 @@ class PengeluaranController extends Controller
     {
         $validator = Validator::make($request->all(), [
             'id_cabang' => 'required|exists:cabang,id_cabang',
-            'id_jenis' => 'required|exists:jenis_pengeluaran,id_jenis',
+            'id_jenis' => 'required',
             'tanggal' => 'required|date',
             'jumlah' => 'required|numeric|min:0',
             'keterangan' => 'required|string|max:255',
+            'is_cicilan_harian' => 'nullable|boolean',
             'details' => 'nullable|array',
             'details.*.id_bahan_baku' => 'required_with:details|exists:bahan_baku,id_bahan_baku',
             'details.*.jumlah_item' => 'required_with:details|numeric|min:1',
@@ -58,27 +59,33 @@ class PengeluaranController extends Controller
         }
 
         DB::beginTransaction();
-
         try {
-            // Hitung jumlah hari dalam bulan dari tanggal pengeluaran
-            $jumlah_hari_bulan_ini = cal_days_in_month(
-                CAL_GREGORIAN,
-                date('m', strtotime($request->tanggal)),
-                date('Y', strtotime($request->tanggal))
-            );
+            $cicilan_harian = null;
 
-            // Hitung cicilan harian otomatis
-            $cicilan_harian = $request->jumlah / $jumlah_hari_bulan_ini;
+            // 🔹 Hitung cicilan harian hanya jika pengeluaran bertipe cicilan
+            if ($request->boolean('is_cicilan_harian')) {
+                $jumlah_hari_bulan_ini = cal_days_in_month(
+                    CAL_GREGORIAN,
+                    date('m', strtotime($request->tanggal)),
+                    date('Y', strtotime($request->tanggal))
+                );
 
+                if ($jumlah_hari_bulan_ini > 0) {
+                    $cicilan_harian = $request->jumlah / $jumlah_hari_bulan_ini;
+                }
+            }
+
+            // 🔹 Tetap simpan JUMLAH TOTAL ke kolom jumlah, cicilan ke kolom cicilan_harian
             $pengeluaran = PengeluaranModel::create([
                 'id_cabang' => $request->id_cabang,
                 'id_jenis' => $request->id_jenis,
                 'tanggal' => $request->tanggal,
-                'jumlah' => $request->jumlah,
+                'jumlah' => $request->jumlah, // total pengeluaran (tetap)
                 'keterangan' => $request->keterangan,
-                'cicilan_harian' => $cicilan_harian, // <── tambahkan ini
+                'cicilan_harian' => $cicilan_harian, // nilai per hari (jika ada)
             ]);
 
+            // 🔹 Simpan detail jika ada
             if (!empty($request->details)) {
                 foreach ($request->details as $detail) {
                     DetailPengeluaranModel::create([
@@ -90,15 +97,30 @@ class PengeluaranController extends Controller
                         'total_harga' => $detail['jumlah_item'] * $detail['harga_satuan'],
                     ]);
                 }
+
+                // 🔹 Update stok jika jenis pengeluaran = pembelian bahan baku
+                $jenis = DB::table('jenis_pengeluaran')->where('id_jenis', $request->id_jenis)->first();
+                if ($jenis && strtolower($jenis->jenis_pengeluaran) === 'pembelian bahan baku') {
+                    foreach ($request->details as $detail) {
+                        DB::table('bahan_baku')->where('id_bahan_baku', $detail['id_bahan_baku'])
+                            ->increment('jumlah_stok', $detail['jumlah_item']);
+                    }
+                }
             }
 
             DB::commit();
-            return response()->json(['status' => 'success', 'message' => 'Pengeluaran berhasil ditambahkan.', 'data' => $pengeluaran], 201);
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Pengeluaran berhasil ditambahkan.',
+                'data' => $pengeluaran
+            ], 201);
+
         } catch (Exception $e) {
             DB::rollBack();
             return response()->json(['status' => 'error', 'message' => 'Terjadi kesalahan server: ' . $e->getMessage()], 500);
         }
     }
+
 
     public function update(Request $request, $id_pengeluaran)
     {
@@ -107,6 +129,7 @@ class PengeluaranController extends Controller
             'tanggal' => 'required|date',
             'jumlah' => 'required|numeric|min:0',
             'keterangan' => 'required|string|max:255',
+            'is_cicilan_harian' => 'nullable|boolean',
             'details' => 'nullable|array',
         ]);
 
@@ -121,23 +144,26 @@ class PengeluaranController extends Controller
 
         DB::beginTransaction();
         try {
-             // Rehitung cicilan_harian ketika nominal diubah
-            $jumlah_hari_bulan_ini = cal_days_in_month(
-                CAL_GREGORIAN,
-                date('m', strtotime($request->tanggal)),
-                date('Y', strtotime($request->tanggal))
-            );
+            $cicilan_harian = null;
+            if ($request->boolean('is_cicilan_harian')) {
+                $jumlah_hari_bulan_ini = cal_days_in_month(
+                    CAL_GREGORIAN,
+                    date('m', strtotime($request->tanggal)),
+                    date('Y', strtotime($request->tanggal))
+                );
+                $cicilan_harian = $request->jumlah / $jumlah_hari_bulan_ini;
+            }
 
-            $cicilan_harian = $request->jumlah / $jumlah_hari_bulan_ini;
-
+            // 🔹 Update data utama (jumlah tetap jumlah pengeluaran, bukan cicilan)
             $pengeluaran->update([
                 'id_jenis' => $request->id_jenis,
                 'tanggal' => $request->tanggal,
-                'jumlah' => $request->jumlah,
+                'jumlah' => $request->jumlah, // tetap jumlah total
                 'keterangan' => $request->keterangan,
-                'cicilan_harian' => $cicilan_harian, // <── update otomatis juga
+                'cicilan_harian' => $cicilan_harian, // update cicilan harian (jika ada)
             ]);
 
+            // 🔁 Revert & update stok + detail seperti sebelumnya...
             DetailPengeluaranModel::where('id_pengeluaran', $id_pengeluaran)->delete();
 
             if (!empty($request->details)) {
@@ -151,24 +177,71 @@ class PengeluaranController extends Controller
                         'total_harga' => $detail['jumlah_item'] * $detail['harga_satuan'],
                     ]);
                 }
+
+                $jenisBaru = DB::table('jenis_pengeluaran')->where('id_jenis', $request->id_jenis)->first();
+                if ($jenisBaru && strtolower($jenisBaru->jenis_pengeluaran) === 'pembelian bahan baku') {
+                    foreach ($request->details as $detail) {
+                        DB::table('bahan_baku')->where('id_bahan_baku', $detail['id_bahan_baku'])
+                            ->increment('jumlah_stok', $detail['jumlah_item']);
+                    }
+                }
             }
 
             DB::commit();
             return response()->json(['status' => 'success', 'message' => 'Pengeluaran berhasil diperbarui.']);
+
         } catch (Exception $e) {
             DB::rollBack();
             return response()->json(['status' => 'error', 'message' => 'Gagal memperbarui: ' . $e->getMessage()], 500);
         }
     }
 
+
     public function destroy($id_pengeluaran)
-    {
-        $pengeluaran = PengeluaranModel::find($id_pengeluaran);
-        if (!$pengeluaran) {
-            return response()->json(['status' => 'error', 'message' => 'Pengeluaran tidak ditemukan.'], 404);
+{
+    $pengeluaran = PengeluaranModel::find($id_pengeluaran);
+    if (!$pengeluaran) {
+        return response()->json([
+            'status' => 'error',
+            'message' => 'Data pengeluaran tidak ditemukan.'
+        ], 404);
+    }
+
+    DB::beginTransaction();
+    try {
+        // 🧩 Cek apakah pengeluaran ini adalah "Pembelian bahan baku"
+        $jenis = DB::table('jenis_pengeluaran')->where('id_jenis', $pengeluaran->id_jenis)->first();
+
+        if ($jenis && strtolower($jenis->jenis_pengeluaran) === 'pembelian bahan baku') {
+            // Ambil semua detail pengeluaran terkait
+            $details = DB::table('detail_pengeluaran')->where('id_pengeluaran', $pengeluaran->id_pengeluaran)->get();
+
+            // Kurangi stok bahan baku sesuai jumlah_item dari tiap detail
+            foreach ($details as $detail) {
+                DB::table('bahan_baku')
+                    ->where('id_bahan_baku', $detail->id_bahan_baku)
+                    ->decrement('jumlah_stok', $detail->jumlah_item);
+            }
         }
 
+        // Hapus detail pengeluaran
+        DB::table('detail_pengeluaran')->where('id_pengeluaran', $pengeluaran->id_pengeluaran)->delete();
+
+        // Hapus pengeluaran utama
         $pengeluaran->delete();
-        return response()->json(['status' => 'success', 'message' => 'Pengeluaran berhasil dihapus.']);
+
+        DB::commit();
+        return response()->json([
+            'status' => 'success',
+            'message' => 'Data pengeluaran berhasil dihapus dan stok telah diperbarui.'
+        ], 200);
+    } catch (Exception $e) {
+        DB::rollBack();
+        return response()->json([
+            'status' => 'error',
+            'message' => 'Gagal menghapus data: ' . $e->getMessage()
+        ], 500);
     }
+}
+
 }

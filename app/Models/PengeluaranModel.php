@@ -18,6 +18,7 @@ class PengeluaranModel extends Model
         'id_jenis',
         'tanggal',
         'jumlah',
+        'cicilan_harian',
         'keterangan',
     ];
 

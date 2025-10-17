@@ -26,10 +26,9 @@ class JenisPengeluaranController extends Controller
      */
     public function store(Request $request)
     {
-        // ✨ FIX: Removed 'id_jenis_pengeluaran' from validation.
         // The database should handle auto-incrementing the ID.
         $validator = Validator::make($request->all(), [
-            'jenis_pengeluaran' => 'required|string|unique:jenis_pengeluaran,jenis_pengeluaran',
+            'jenis_pengeluaran' => 'required',
         ]);
 
         if ($validator->fails()) {
@@ -40,7 +39,7 @@ class JenisPengeluaranController extends Controller
             ], 422);
         }
 
-        // ✨ FIX: Removed 'id_jenis_pengeluaran' from the create array.
+
         $jenis_pengeluaran = JenisPengeluaranModel::create([
             'jenis_pengeluaran' => $request->jenis_pengeluaran,
         ]);
@@ -55,9 +54,9 @@ class JenisPengeluaranController extends Controller
     /**
      * Edit data pengeluaran.
      */
-    public function update(Request $request, $id_jenis_pengeluaran)
+    public function update(Request $request, $id_jenis)
     {
-        $jenis_pengeluaran = JenisPengeluaranModel::find($id_jenis_pengeluaran);
+        $jenis_pengeluaran = JenisPengeluaranModel::find($id_jenis);
 
         if (!$jenis_pengeluaran) {
             return response()->json([
@@ -92,9 +91,9 @@ class JenisPengeluaranController extends Controller
     /**
      * Hapus jenis pengeluaran.
      */
-    public function destroy($id_jenis_pengeluaran)
+    public function destroy($id_jenis)
     {
-        $jenis_pengeluaran = JenisPengeluaranModel::find($id_jenis_pengeluaran);
+        $jenis_pengeluaran = JenisPengeluaranModel::find($id_jenis);
 
         if (!$jenis_pengeluaran) {
             return response()->json([
