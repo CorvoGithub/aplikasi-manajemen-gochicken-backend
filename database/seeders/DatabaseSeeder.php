@@ -20,8 +20,8 @@ class DatabaseSeeder extends Seeder
             CabangSeeder::class,
             AdminCabangSeeder::class,
             SuperAdminSeeder::class,
-            TransaksiSeeder::class,
-            PengeluaranSeeder::class,
+            // TransaksiSeeder::class,
+            // PengeluaranSeeder::class,
             JenisPengeluaranSeeder::class,
             BahanBakuSeeder::class,
         ]);

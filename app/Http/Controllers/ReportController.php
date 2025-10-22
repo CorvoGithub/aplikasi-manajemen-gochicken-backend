@@ -8,7 +8,9 @@ use Carbon\Carbon;
 
 class ReportController extends Controller
 {
-
+    // ===================================================================
+    //                      --- FUNGSI GLOBAL ---
+    // ===================================================================
     private function applyTimeFilter($query, $filter, $dateColumn)
     {
         return $query->when($filter === 'minggu', function ($q) use ($dateColumn) {
@@ -20,9 +22,72 @@ class ReportController extends Controller
         });
     }
 
-    /**
-     * Fetch all reports for the dashboard of a specific branch.
-     */
+
+    // ===================================================================
+    //              --- FUNGSI UNTUK SUPER ADMIN ---
+    // ===================================================================
+    public function productReportSuperAdmin(Request $request)
+    {
+        $products = DB::table('produk as p')
+            ->join('stok_cabang as sc', 'p.id_produk', '=', 'sc.id_produk')
+            ->join('cabang as c', 'sc.id_cabang', '=', 'c.id_cabang')
+            ->select(
+                'p.nama_produk',
+                'p.kategori',
+                'c.nama_cabang as cabang',
+                'p.harga',
+                'sc.jumlah_stok'
+            )
+            ->select('p.nama_produk', 'p.kategori', 'c.nama_cabang as cabang', 'p.harga', 'sc.jumlah_stok')
+            ->orderBy('p.nama_produk')
+            ->paginate($request->get('limit', 10));
+
+        return response()->json($products);
+    }
+
+    public function salesTransactionsSuperAdmin(Request $request)
+    {
+        $filter = $request->query('filter', 'bulan');
+        $query = DB::table('transaksi');
+        
+        $transaksi = $this->applyTimeFilter($query, $filter, 'tanggal_waktu')
+            ->select('kode_transaksi', 'tanggal_waktu', 'metode_pembayaran', 'total_harga')
+            ->orderByDesc('tanggal_waktu')
+            ->paginate($request->get('limit', 10));
+
+        return response()->json($transaksi);
+    }
+
+    public function salesExpensesSuperAdmin(Request $request)
+    {
+        $filter = $request->query('filter', 'bulan');
+        $query = DB::table('pengeluaran as p');
+        
+        $pengeluaran = $this->applyTimeFilter($query, $filter, 'p.tanggal')
+            ->join('jenis_pengeluaran as jp', 'p.id_jenis', '=', 'jp.id_jenis')
+            ->select('p.tanggal', 'jp.jenis_pengeluaran as jenis', 'p.jumlah', 'p.keterangan')
+            ->orderByDesc('p.tanggal')
+            ->paginate($request->get('limit', 10));
+
+        return response()->json($pengeluaran);
+    }
+
+    public function employeeReportSuperAdmin(Request $request)
+    {
+        $karyawan = DB::table('karyawan as k')
+            ->join('cabang as c', 'k.id_cabang', '=', 'c.id_cabang')
+            ->select('k.nama_karyawan', 'k.alamat', 'k.telepon', 'k.gaji', 'c.nama_cabang as cabang')
+            ->orderBy('k.nama_karyawan')
+            ->paginate($request->get('limit', 1000));
+
+        return response()->json($karyawan);
+    }
+
+
+    // ===================================================================
+    //              --- FUNGSI UNTUK ADMIN CABANG ---
+    // ===================================================================
+
     public function cabangReport(Request $request, $id)
     {
         $filter = $request->query('filter', 'bulan');
@@ -93,11 +158,6 @@ class ReportController extends Controller
         ]);
     }
 
-    
-
-    /**
-     * Fetch all reports across all branches for Super Admin dashboard.
-     */
     public function allCabangReport(Request $request)
     {
         $filter = $request->query('filter', 'bulan'); // default bulan
@@ -173,70 +233,6 @@ class ReportController extends Controller
         ]);
     }
 
-    public function productReportSuperAdmin(Request $request)
-    {
-        $products = DB::table('produk as p')
-            ->join('stok_cabang as sc', 'p.id_produk', '=', 'sc.id_produk')
-            ->join('cabang as c', 'sc.id_cabang', '=', 'c.id_cabang')
-            ->select(
-                'p.nama_produk',
-                'p.kategori',
-                'c.nama_cabang as cabang',
-                'p.harga',
-                'sc.jumlah_stok'
-            )
-            ->select('p.nama_produk', 'p.kategori', 'c.nama_cabang as cabang', 'p.harga', 'sc.jumlah_stok')
-            ->orderBy('p.nama_produk')
-            ->paginate($request->get('limit', 10));
-
-        return response()->json($products);
-    }
-
-    /**
-     * Fetch paginated list of sales transactions for super admin across all branches.
-     */
-    public function salesTransactionsSuperAdmin(Request $request)
-    {
-        $transaksi = DB::table('transaksi')
-            ->select('kode_transaksi', 'tanggal_waktu', 'metode_pembayaran', 'total_harga')
-            ->orderByDesc('tanggal_waktu')
-            ->paginate($request->get('limit', 10));
-
-        return response()->json($transaksi);
-    }
-
-    /**
-     * Fetch paginated list of expenses for super admin across all branches.
-     */
-    public function salesExpensesSuperAdmin(Request $request)
-    {
-        $pengeluaran = DB::table('pengeluaran as p')
-            ->join('jenis_pengeluaran as jp', 'p.id_jenis', '=', 'jp.id_jenis')
-            ->select('p.tanggal', 'jp.jenis_pengeluaran as jenis', 'p.jumlah', 'p.keterangan')
-            ->orderByDesc('p.tanggal')
-            ->paginate($request->get('limit', 10));
-
-        return response()->json($pengeluaran);
-    }
-
-    public function employeeReportSuperAdmin(Request $request)
-    {
-        $karyawan = DB::table('karyawan')
-            ->select('nama_karyawan', 'alamat', 'telepon', 'gaji')
-            ->orderBy('nama_karyawan')
-            ->paginate($request->get('limit', 10));
-
-        return response()->json($karyawan);
-    }
-
-
-    //----------------------------------------------------------------------------------
-    // All new paginated report methods below
-    //----------------------------------------------------------------------------------
-
-    /**
-     * Fetch paginated list of products for a specific branch.
-     */
     public function productReportPaginated(Request $request, $id)
     {
         $products = DB::table('produk as p')
@@ -281,4 +277,5 @@ class ReportController extends Controller
             ->paginate($request->get('limit', 10));
         return response()->json($pengeluaran);
     }
+
 }
