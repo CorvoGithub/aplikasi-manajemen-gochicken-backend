@@ -6,6 +6,7 @@ use App\Models\CabangModel;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Validator;
+use App\Services\AuditLogService;
 
 class CabangController extends Controller
 {
@@ -49,6 +50,14 @@ class CabangController extends Controller
             'password_cabang' => Hash::make($request->password_cabang),
         ]);
 
+        // Log creation
+        AuditLogService::logCreate(
+            'cabang',
+            $cabang->id_cabang,
+            $cabang->toArray(),
+            "Cabang {$cabang->nama_cabang} berhasil ditambahkan"
+        );
+
         return response()->json([
             'status' => 'success',
             'message' => 'Cabang berhasil ditambahkan.',
@@ -69,6 +78,9 @@ class CabangController extends Controller
                 'message' => 'Cabang tidak ditemukan.',
             ], 404);
         }
+
+        // Store old data for audit log
+        $oldData = $cabang->toArray();
 
         $validator = Validator::make($request->all(), [
             'nama_cabang' => 'required',
@@ -96,6 +108,18 @@ class CabangController extends Controller
 
         $cabang->save();
 
+        // Refresh to get updated data
+        $cabang->refresh();
+
+        // Log update
+        AuditLogService::logUpdate(
+            'cabang',
+            $cabang->id_cabang,
+            $oldData,
+            $cabang->toArray(),
+            "Data cabang {$cabang->nama_cabang} berhasil diupdate"
+        );
+
         return response()->json([
             'status' => 'success',
             'message' => 'Cabang berhasil diupdate.',
@@ -117,7 +141,18 @@ class CabangController extends Controller
             ], 404);
         }
 
+        // Store old data for audit log
+        $oldData = $cabang->toArray();
+
         $cabang->delete();
+
+        // Log deletion
+        AuditLogService::logDelete(
+            'cabang',
+            $id_cabang,
+            $oldData,
+            "Cabang {$oldData['nama_cabang']} berhasil dihapus"
+        );
 
         return response()->json([
             'status' => 'success',

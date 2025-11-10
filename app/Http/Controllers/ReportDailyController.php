@@ -7,7 +7,10 @@ use Carbon\Carbon;
 
 class ReportDailyController extends Controller
 {
-    // ✅ GET laporan harian lengkap
+    // ===================================================================
+    //              --- FUNGSI UNTUK SUPER ADMIN ---
+    // ===================================================================
+
     public function getDailyReport(Request $request)
     {
         try {
@@ -29,20 +32,22 @@ class ReportDailyController extends Controller
                 ->whereRaw('DATE(transaksi.tanggal_waktu) = ?', [$date])
                 ->count();
 
-            // === PENJUALAN ===
-            // Coba dengan case insensitive
+            // === PENJUALAN - UPDATED TO INCLUDE tanggal_waktu ===
             $penjualan = DB::table('detail_transaksi')
                 ->join('transaksi', 'detail_transaksi.id_transaksi', '=', 'transaksi.id_transaksi')
                 ->join('produk', 'detail_transaksi.id_produk', '=', 'produk.id_produk')
+                ->join('cabang', 'transaksi.id_cabang', '=', 'cabang.id_cabang')
                 ->select(
                     'produk.nama_produk as produk',
+                    'cabang.nama_cabang',
+                    'transaksi.tanggal_waktu', // ADDED: Include transaction date
                     DB::raw('SUM(detail_transaksi.jumlah_produk) as jumlah_produk'),
                     DB::raw('AVG(detail_transaksi.harga_item) as harga_item'),
                     DB::raw('SUM(detail_transaksi.jumlah_produk * detail_transaksi.harga_item) as total_penjualan_produk')
                 )
                 ->whereRaw('DATE(transaksi.tanggal_waktu) = ?', [$date])
                 ->whereRaw('LOWER(TRIM(transaksi.status_transaksi)) = ?', ['selesai'])
-                ->groupBy('produk.nama_produk', 'produk.id_produk')
+                ->groupBy('produk.nama_produk', 'produk.id_produk', 'cabang.nama_cabang', 'transaksi.tanggal_waktu')
                 ->get();
 
             $total_penjualan = $penjualan->sum('total_penjualan_produk');
@@ -63,16 +68,17 @@ class ReportDailyController extends Controller
             $total_modal = $bahan_baku->sum('modal_produk');
 
             // === PENGELUARAN ===
-            // Ambil semua pengeluaran bulan ini yang punya cicilan_harian
             $pengeluaran = DB::table('pengeluaran')
                 ->join('jenis_pengeluaran', 'pengeluaran.id_jenis', '=', 'jenis_pengeluaran.id_jenis')
+                ->join('cabang', 'pengeluaran.id_cabang', '=', 'cabang.id_cabang')
                 ->select(
                     'pengeluaran.id_pengeluaran',
                     'pengeluaran.tanggal',
                     'pengeluaran.jumlah',
                     'pengeluaran.cicilan_harian',
+                    'pengeluaran.keterangan',
                     'jenis_pengeluaran.jenis_pengeluaran as jenis',
-                    'pengeluaran.keterangan'
+                    'cabang.nama_cabang'
                 )
                 ->where(function ($query) use ($date) {
                     $query
@@ -85,7 +91,6 @@ class ReportDailyController extends Controller
                         });
                 })
                 ->get();
-
 
             $pengeluaran_harian = 0;
             $pengeluaran_detail = [];
@@ -107,10 +112,13 @@ class ReportDailyController extends Controller
                 }
 
                 $pengeluaran_detail[] = [
+                    'id_pengeluaran' => $item->id_pengeluaran,
                     'jenis' => $item->jenis,
                     'keterangan' => $item->keterangan,
                     'jumlah' => $item->jumlah,
                     'cicilan_harian' => $harian,
+                    'tanggal' => $item->tanggal,
+                    'nama_cabang' => $item->nama_cabang,
                 ];
             }
 
@@ -149,6 +157,7 @@ class ReportDailyController extends Controller
                 'raw_sql_penjualan' => DB::table('detail_transaksi')
                     ->join('transaksi', 'detail_transaksi.id_transaksi', '=', 'transaksi.id_transaksi')
                     ->join('produk', 'detail_transaksi.id_produk', '=', 'produk.id_produk')
+                    ->join('cabang', 'transaksi.id_cabang', '=', 'cabang.id_cabang')
                     ->whereRaw('DATE(transaksi.tanggal_waktu) = ?', [$date])
                     ->whereRaw('LOWER(TRIM(transaksi.status_transaksi)) = ?', ['selesai'])
                     ->toSql(),
@@ -165,7 +174,7 @@ class ReportDailyController extends Controller
                     'total_modal_bahan_baku' => $total_modal
                 ],
                 'pengeluaran' => [
-                    'detail' => $pengeluaran,
+                    'detail' => $pengeluaran_detail,
                     'cicilan_harian' => $pengeluaran_harian,
                     'total_pengeluaran_bulanan' => $total_pengeluaran_bulanan
                 ],
@@ -218,6 +227,47 @@ class ReportDailyController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => 'Gagal memperbarui status',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    // ✅ HAPUS PENGELUARAN (FORCE DELETE - allows deletion even if active)
+    public function deletePengeluaran($id)
+    {
+        try {
+            // Cek apakah pengeluaran ada
+            $pengeluaran = DB::table('pengeluaran')
+                ->where('id_pengeluaran', $id)
+                ->first();
+
+            if (!$pengeluaran) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Data pengeluaran tidak ditemukan'
+                ], 404);
+            }
+
+            $deleted = DB::table('pengeluaran')
+                ->where('id_pengeluaran', $id)
+                ->delete();
+
+            if ($deleted) {
+                return response()->json([
+                    'success' => true,
+                    'message' => 'Pengeluaran berhasil dihapus'
+                ]);
+            }
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Gagal menghapus pengeluaran'
+            ], 500);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Gagal menghapus pengeluaran',
                 'error' => $e->getMessage()
             ], 500);
         }

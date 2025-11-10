@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\BahanBakuModel;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
+use App\Services\AuditLogService;
 
 class BahanBakuController extends Controller
 {
@@ -43,6 +44,14 @@ class BahanBakuController extends Controller
 
         $bahan = BahanBakuModel::create($request->all());
 
+        // Log creation
+        AuditLogService::logCreate(
+            'bahan_baku',
+            $bahan->id_bahan_baku,
+            $bahan->toArray(),
+            "Bahan baku {$bahan->nama_bahan} berhasil ditambahkan"
+        );
+
         return response()->json([
             'status' => 'success',
             'message' => 'Bahan baku berhasil ditambahkan.',
@@ -64,6 +73,9 @@ class BahanBakuController extends Controller
             ], 404);
         }
 
+        // Store old data for audit log
+        $oldData = $bahan->toArray();
+
         $validator = Validator::make($request->all(), [
             'nama_bahan' => 'required',
             'satuan' => 'required',
@@ -80,6 +92,18 @@ class BahanBakuController extends Controller
         }
 
         $bahan->update($request->all());
+
+        // Refresh to get updated data
+        $bahan->refresh();
+
+        // Log update
+        AuditLogService::logUpdate(
+            'bahan_baku',
+            $bahan->id_bahan_baku,
+            $oldData,
+            $bahan->toArray(),
+            "Bahan baku {$bahan->nama_bahan} berhasil diupdate"
+        );
 
         return response()->json([
             'status' => 'success',
@@ -102,6 +126,9 @@ class BahanBakuController extends Controller
             ], 404);
         }
 
+        // Store old data for audit log
+        $oldData = $bahan->toArray();
+
         // Optional: Cek apakah ada relasi detail pengeluaran
         if ($bahan->detailPengeluaran()->exists()) {
             return response()->json([
@@ -111,6 +138,14 @@ class BahanBakuController extends Controller
         }
 
         $bahan->delete();
+
+        // Log deletion
+        AuditLogService::logDelete(
+            'bahan_baku',
+            $id_bahan_baku,
+            $oldData,
+            "Bahan baku {$oldData['nama_bahan']} berhasil dihapus"
+        );
 
         return response()->json([
             'status' => 'success',

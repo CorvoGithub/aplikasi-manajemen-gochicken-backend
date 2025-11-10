@@ -12,6 +12,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
 use Carbon\Carbon;
 use Exception;
+use App\Services\AuditLogService;
 
 class PemesananController extends Controller
 {
@@ -59,10 +60,17 @@ class PemesananController extends Controller
         DB::beginTransaction();
         try {
             $totalHarga = 0;
+            $detailProduk = [];
+            
             foreach ($request->details as $item) {
                 $produk = ProdukModel::find($item['id_produk']);
                 if (!$produk) throw new Exception('Produk tidak ditemukan.');
                 $totalHarga += $produk->harga * $item['jumlah_produk'];
+                $detailProduk[] = [
+                    'produk' => $produk->nama_produk,
+                    'jumlah' => $item['jumlah_produk'],
+                    'harga' => $produk->harga
+                ];
             }
             
             // ✨ PERBAIKAN: Membuat format kode transaksi yang benar
@@ -79,6 +87,8 @@ class PemesananController extends Controller
                 'kode_transaksi' => $kodeTransaksi,
             ]);
 
+            $stokChanges = [];
+            
             foreach ($request->details as $item) {
                 $produk = ProdukModel::find($item['id_produk']);
                 DetailTransaksiModel::create([
@@ -93,8 +103,36 @@ class PemesananController extends Controller
                 if (!$stok || $stok->jumlah_stok < $item['jumlah_produk']) {
                     throw new Exception('Stok untuk produk "' . $produk->nama_produk . '" tidak mencukupi.');
                 }
+                
+                $stokSebelum = $stok->jumlah_stok;
                 $stok->decrement('jumlah_stok', $item['jumlah_produk']);
+                $stokSesudah = $stok->jumlah_stok;
+                
+                $stokChanges[] = [
+                    'produk' => $produk->nama_produk,
+                    'stok_sebelum' => $stokSebelum,
+                    'stok_sesudah' => $stokSesudah,
+                    'jumlah_dipakai' => $item['jumlah_produk']
+                ];
             }
+
+            // Log creation
+            AuditLogService::logCreate(
+                'transaksi',
+                $transaksi->id_transaksi,
+                [
+                    'id_transaksi' => $transaksi->id_transaksi,
+                    'kode_transaksi' => $transaksi->kode_transaksi,
+                    'id_cabang' => $transaksi->id_cabang,
+                    'nama_pelanggan' => $transaksi->nama_pelanggan,
+                    'total_harga' => $transaksi->total_harga,
+                    'status_transaksi' => $transaksi->status_transaksi,
+                    'metode_pembayaran' => $transaksi->metode_pembayaran,
+                    'detail_produk' => $detailProduk,
+                    'stok_changes' => $stokChanges
+                ],
+                "Pemesanan baru dibuat untuk pelanggan {$transaksi->nama_pelanggan} dengan total Rp " . number_format($transaksi->total_harga, 0, ',', '.')
+            );
 
             DB::commit();
             return response()->json(['status' => 'success', 'message' => 'Pemesanan berhasil dibuat.'], 201);
@@ -105,26 +143,78 @@ class PemesananController extends Controller
     }
 
     public function update(Request $request, $id_transaksi) {
-        $validator = Validator::make($request->all(), [ 'status_transaksi' => 'required|in:OnLoan,Selesai', ]);
-        if ($validator->fails()) { return response()->json(['status' => 'error', 'message' => 'Data tidak valid.'], 422); }
+        $validator = Validator::make($request->all(), [ 
+            'status_transaksi' => 'required|in:OnLoan,Selesai', 
+        ]);
+        
+        if ($validator->fails()) { 
+            return response()->json(['status' => 'error', 'message' => 'Data tidak valid.'], 422); 
+        }
+        
         $transaksi = TransaksiModel::find($id_transaksi);
-        if (!$transaksi) { return response()->json(['status' => 'error', 'message' => 'Transaksi tidak ditemukan.'], 404); }
+        
+        if (!$transaksi) { 
+            return response()->json(['status' => 'error', 'message' => 'Transaksi tidak ditemukan.'], 404); 
+        }
+
+        // Store old data for audit log
+        $oldStatus = $transaksi->status_transaksi;
+        
         $transaksi->status_transaksi = $request->status_transaksi;
         $transaksi->save();
+
+        // Log update
+        AuditLogService::logUpdate(
+            'transaksi',
+            $transaksi->id_transaksi,
+            ['status_transaksi' => $oldStatus],
+            ['status_transaksi' => $transaksi->status_transaksi],
+            "Status pemesanan {$transaksi->kode_transaksi} diupdate: {$oldStatus} → {$transaksi->status_transaksi}"
+        );
+
         return response()->json(['status' => 'success', 'message' => 'Status pemesanan berhasil diupdate.']);
     }
 
     public function destroy($id_transaksi) {
         $transaksi = TransaksiModel::with('details')->find($id_transaksi);
-        if (!$transaksi) { return response()->json(['status' => 'error', 'message' => 'Transaksi tidak ditemukan.'], 404); }
+        
+        if (!$transaksi) { 
+            return response()->json(['status' => 'error', 'message' => 'Transaksi tidak ditemukan.'], 404); 
+        }
+        
         DB::beginTransaction();
         try {
+            // Store old data for audit log
+            $oldData = $transaksi->toArray();
+            $stokChanges = [];
+            
             foreach ($transaksi->details as $item) {
                 $stok = StokCabangModel::where('id_cabang', $transaksi->id_cabang)->where('id_produk', $item->id_produk)->first();
-                if ($stok) { $stok->increment('jumlah_stok', $item->jumlah_produk); }
+                if ($stok) { 
+                    $stokSebelum = $stok->jumlah_stok;
+                    $stok->increment('jumlah_stok', $item->jumlah_produk);
+                    $stokSesudah = $stok->jumlah_stok;
+                    
+                    $stokChanges[] = [
+                        'produk_id' => $item->id_produk,
+                        'stok_sebelum' => $stokSebelum,
+                        'stok_sesudah' => $stokSesudah,
+                        'jumlah_dikembalikan' => $item->jumlah_produk
+                    ];
+                }
             }
+            
             $transaksi->details()->delete();
             $transaksi->delete();
+
+            // Log deletion
+            AuditLogService::logDelete(
+                'transaksi',
+                $id_transaksi,
+                $oldData,
+                "Pemesanan {$oldData['kode_transaksi']} untuk pelanggan {$oldData['nama_pelanggan']} berhasil dihapus. Stok dikembalikan."
+            );
+
             DB::commit();
             return response()->json(['status' => 'success', 'message' => 'Pemesanan berhasil dihapus.']);
         } catch (Exception $e) {
@@ -133,4 +223,3 @@ class PemesananController extends Controller
         }
     }
 }
-

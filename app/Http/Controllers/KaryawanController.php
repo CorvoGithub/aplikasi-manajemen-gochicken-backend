@@ -6,6 +6,7 @@ use Illuminate\Http\Request;
 use App\Models\KaryawanModel;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Validator;
+use App\Services\AuditLogService;
 
 class KaryawanController extends Controller
 {
@@ -23,7 +24,7 @@ class KaryawanController extends Controller
     }
 
     /**
-     * Tambah cabang baru.
+     * Tambah karyawan baru.
      */
     public function store(Request $request)
     {
@@ -52,6 +53,14 @@ class KaryawanController extends Controller
             'gaji' => $request->gaji,
         ]);
 
+        // Log creation
+        AuditLogService::logCreate(
+            'karyawan',
+            $karyawan->id_karyawan,
+            $karyawan->toArray(),
+            "Karyawan {$karyawan->nama_karyawan} berhasil ditambahkan"
+        );
+
         return response()->json([
             'status' => 'success',
             'message' => 'Karyawan berhasil ditambahkan.',
@@ -60,7 +69,7 @@ class KaryawanController extends Controller
     }
 
     /**
-     * Edit data cabang.
+     * Edit data karyawan.
      */
     public function update(Request $request, $id_karyawan)
     {
@@ -72,6 +81,9 @@ class KaryawanController extends Controller
                 'message' => 'Karyawan tidak ditemukan.',
             ], 404);
         }
+
+        // Store old data for audit log
+        $oldData = $karyawan->toArray();
 
         $validator = Validator::make($request->all(), [
             'nama_karyawan' => 'required|string|max:255',
@@ -102,6 +114,15 @@ class KaryawanController extends Controller
 
         $karyawan->save();
 
+        // Log update
+        AuditLogService::logUpdate(
+            'karyawan',
+            $karyawan->id_karyawan,
+            $oldData,
+            $karyawan->toArray(),
+            "Data karyawan {$karyawan->nama_karyawan} berhasil diupdate"
+        );
+
         return response()->json([
             'status' => 'success',
             'message' => 'Karyawan berhasil diupdate.',
@@ -110,7 +131,7 @@ class KaryawanController extends Controller
     }
 
     /**
-     * Hapus cabang.
+     * Hapus karyawan.
      */
     public function destroy($id_karyawan)
     {
@@ -123,7 +144,18 @@ class KaryawanController extends Controller
             ], 404);
         }
 
+        // Store old data for audit log
+        $oldData = $karyawan->toArray();
+
         $karyawan->delete();
+
+        // Log deletion
+        AuditLogService::logDelete(
+            'karyawan',
+            $id_karyawan,
+            $oldData,
+            "Karyawan {$oldData['nama_karyawan']} berhasil dihapus"
+        );
 
         return response()->json([
             'status' => 'success',

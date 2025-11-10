@@ -8,6 +8,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\DB;
 use App\Models\StokCabangModel;
+use App\Services\AuditLogService;
 
 class ProdukController extends Controller
 {
@@ -27,8 +28,6 @@ class ProdukController extends Controller
     /**
      * Tambah produk baru.
      */
-    // In App\Http\Controllers\ProdukController.php
-
     public function store(Request $request)
     {
         $validator = Validator::make($request->all(), [
@@ -63,13 +62,20 @@ class ProdukController extends Controller
         // Buat produk dengan data gambar yang sudah ada
         $produk = ProdukModel::create($produkData);
 
+        // Log creation
+        AuditLogService::logCreate(
+            'produk',
+            $produk->id_produk,
+            $produk->toArray(),
+            "Produk {$produk->nama_produk} berhasil ditambahkan dengan harga Rp " . number_format($produk->harga, 0, ',', '.')
+        );
+
         return response()->json([
             'status' => 'success',
             'message' => 'Produk berhasil ditambahkan.',
             'data' => $produk,
         ], 201);
     }
-
 
     /**
      * Edit data produk.
@@ -84,6 +90,9 @@ class ProdukController extends Controller
                 'message' => 'Produk tidak ditemukan.',
             ], 404);
         }
+
+        // Store old data for audit log
+        $oldData = $produk->toArray();
 
         $validator = Validator::make($request->all(), [
             'nama_produk' => 'required',
@@ -119,6 +128,18 @@ class ProdukController extends Controller
 
         $produk->save();
 
+        // Refresh to get updated data
+        $produk->refresh();
+
+        // Log update
+        AuditLogService::logUpdate(
+            'produk',
+            $produk->id_produk,
+            $oldData,
+            $produk->toArray(),
+            "Produk {$produk->nama_produk} berhasil diupdate - Harga: Rp " . number_format($oldData['harga'], 0, ',', '.') . " → Rp " . number_format($produk->harga, 0, ',', '.')
+        );
+
         return response()->json([
             'status' => 'success',
             'message' => 'Produk berhasil diupdate.',
@@ -140,7 +161,18 @@ class ProdukController extends Controller
             ], 404);
         }
 
+        // Store old data for audit log
+        $oldData = $produk->toArray();
+
         $produk->delete();
+
+        // Log deletion
+        AuditLogService::logDelete(
+            'produk',
+            $id_produk,
+            $oldData,
+            "Produk {$oldData['nama_produk']} berhasil dihapus"
+        );
 
         return response()->json([
             'status' => 'success',
@@ -202,6 +234,10 @@ class ProdukController extends Controller
         try {
             $stok = StokCabangModel::findOrFail($id_stock_cabang);
 
+            // Store old data for audit log
+            $oldStok = $stok->jumlah_stok;
+            $produk = $stok->produk;
+
             // Use a transaction to ensure data integrity
             DB::transaction(function () use ($stok, $request) {
                 $newStok = $stok->jumlah_stok + $request->jumlah;
@@ -214,6 +250,18 @@ class ProdukController extends Controller
                 $stok->jumlah_stok = $newStok;
                 $stok->save();
             });
+
+            // Refresh to get updated data
+            $stok->refresh();
+
+            // Log stock update
+            AuditLogService::logUpdate(
+                'stok_cabang',
+                $stok->id_stock_cabang,
+                ['jumlah_stok' => $oldStok],
+                ['jumlah_stok' => $stok->jumlah_stok],
+                "Stok produk {$produk->nama_produk} diupdate: {$oldStok} → {$stok->jumlah_stok} (Perubahan: {$request->jumlah})"
+            );
 
             return response()->json([
                 'status' => 'success',

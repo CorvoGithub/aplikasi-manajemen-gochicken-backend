@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use Illuminate\Http\Request;
 use App\Models\JenisPengeluaranModel;
 use Illuminate\Support\Facades\Validator;
+use App\Services\AuditLogService;
 
 class JenisPengeluaranController extends Controller
 {
@@ -39,10 +40,17 @@ class JenisPengeluaranController extends Controller
             ], 422);
         }
 
-
         $jenis_pengeluaran = JenisPengeluaranModel::create([
             'jenis_pengeluaran' => $request->jenis_pengeluaran,
         ]);
+
+        // Log creation
+        AuditLogService::logCreate(
+            'jenis_pengeluaran',
+            $jenis_pengeluaran->id_jenis,
+            $jenis_pengeluaran->toArray(),
+            "Jenis pengeluaran {$jenis_pengeluaran->jenis_pengeluaran} berhasil ditambahkan"
+        );
 
         return response()->json([
             'status' => 'success',
@@ -65,6 +73,9 @@ class JenisPengeluaranController extends Controller
             ], 404);
         }
 
+        // Store old data for audit log
+        $oldData = $jenis_pengeluaran->toArray();
+
         $validator = Validator::make($request->all(), [
             'jenis_pengeluaran' => 'required',
         ]);
@@ -80,6 +91,18 @@ class JenisPengeluaranController extends Controller
         $jenis_pengeluaran->jenis_pengeluaran = $request->jenis_pengeluaran ?? $jenis_pengeluaran->jenis_pengeluaran;
 
         $jenis_pengeluaran->save();
+
+        // Refresh to get updated data
+        $jenis_pengeluaran->refresh();
+
+        // Log update
+        AuditLogService::logUpdate(
+            'jenis_pengeluaran',
+            $jenis_pengeluaran->id_jenis,
+            $oldData,
+            $jenis_pengeluaran->toArray(),
+            "Jenis pengeluaran berhasil diupdate: {$oldData['jenis_pengeluaran']} → {$jenis_pengeluaran->jenis_pengeluaran}"
+        );
 
         return response()->json([
             'status' => 'success',
@@ -102,7 +125,18 @@ class JenisPengeluaranController extends Controller
             ], 404);
         }
 
+        // Store old data for audit log
+        $oldData = $jenis_pengeluaran->toArray();
+
         $jenis_pengeluaran->delete();
+
+        // Log deletion
+        AuditLogService::logDelete(
+            'jenis_pengeluaran',
+            $id_jenis,
+            $oldData,
+            "Jenis pengeluaran {$oldData['jenis_pengeluaran']} berhasil dihapus"
+        );
 
         return response()->json([
             'status' => 'success',

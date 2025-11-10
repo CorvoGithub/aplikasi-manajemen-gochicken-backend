@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use Illuminate\Http\Request;
 use App\Models\DetailPengeluaranModel;
 use Illuminate\Support\Facades\Validator;
+use App\Services\AuditLogService;
 
 class DetailPengeluaranController extends Controller
 {
@@ -48,6 +49,14 @@ class DetailPengeluaranController extends Controller
 
         $detail = DetailPengeluaranModel::create($request->all());
 
+        // Log creation
+        AuditLogService::logCreate(
+            'detail_pengeluaran',
+            $detail->id_detail_pengeluaran,
+            $detail->toArray(),
+            "Detail pengeluaran berhasil ditambahkan untuk pengeluaran ID {$detail->id_pengeluaran}"
+        );
+
         return response()->json([
             'status' => 'success',
             'message' => 'Detail pengeluaran berhasil ditambahkan.',
@@ -69,6 +78,9 @@ class DetailPengeluaranController extends Controller
             ], 404);
         }
 
+        // Store old data for audit log
+        $oldData = $detail->toArray();
+
         $validator = Validator::make($request->all(), [
             'id_bahan_baku' => 'sometimes|required',
             'id_cabang' => 'sometimes|required',
@@ -79,7 +91,6 @@ class DetailPengeluaranController extends Controller
             'total_harga' => 'sometimes|numeric',
         ]);
 
-
         if ($validator->fails()) {
             return response()->json([
                 'status' => 'error',
@@ -89,6 +100,18 @@ class DetailPengeluaranController extends Controller
         }
 
         $detail->update($request->all());
+
+        // Refresh to get updated data
+        $detail->refresh();
+
+        // Log update
+        AuditLogService::logUpdate(
+            'detail_pengeluaran',
+            $detail->id_detail_pengeluaran,
+            $oldData,
+            $detail->toArray(),
+            "Detail pengeluaran ID {$detail->id_detail_pengeluaran} berhasil diupdate"
+        );
 
         return response()->json([
             'status' => 'success',
@@ -111,7 +134,18 @@ class DetailPengeluaranController extends Controller
             ], 404);
         }
 
+        // Store old data for audit log
+        $oldData = $detail->toArray();
+
         $detail->delete();
+
+        // Log deletion
+        AuditLogService::logDelete(
+            'detail_pengeluaran',
+            $id_detail_pengeluaran,
+            $oldData,
+            "Detail pengeluaran ID {$id_detail_pengeluaran} berhasil dihapus dari pengeluaran ID {$oldData['id_pengeluaran']}"
+        );
 
         return response()->json([
             'status' => 'success',

@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use Illuminate\Http\Request;
 use App\Models\StokCabangModel;
 use Illuminate\Support\Facades\Validator;
+use App\Services\AuditLogService;
 
 class StokCabang extends Controller
 {
@@ -13,7 +14,7 @@ class StokCabang extends Controller
      */
     public function index()
     {
-        $stokCabang = StokCabangModel::all();
+        $stokCabang = StokCabangModel::with(['produk', 'cabang'])->get();
 
         return response()->json([
             'status' => 'success',
@@ -43,6 +44,25 @@ class StokCabang extends Controller
 
         $stok = StokCabangModel::create($request->all());
 
+        // Get related data for audit log
+        $produk = $stok->produk;
+        $cabang = $stok->cabang;
+
+        // Log creation
+        AuditLogService::logCreate(
+            'stok_cabang',
+            $stok->id_stock_cabang,
+            [
+                'id_stock_cabang' => $stok->id_stock_cabang,
+                'id_cabang' => $stok->id_cabang,
+                'id_produk' => $stok->id_produk,
+                'jumlah_stok' => $stok->jumlah_stok,
+                'produk_nama' => $produk->nama_produk,
+                'cabang_nama' => $cabang->nama_cabang
+            ],
+            "Stok cabang berhasil ditambahkan - Produk: {$produk->nama_produk}, Cabang: {$cabang->nama_cabang}, Jumlah: {$stok->jumlah_stok}"
+        );
+
         return response()->json([
             'status' => 'success',
             'message' => 'Stok cabang berhasil ditambahkan.',
@@ -64,6 +84,11 @@ class StokCabang extends Controller
             ], 404);
         }
 
+        // Store old data for audit log
+        $oldData = $stok->toArray();
+        $produk = $stok->produk;
+        $cabang = $stok->cabang;
+
         $validator = Validator::make($request->all(), [
             'id_cabang' => 'required',
             'id_produk' => 'required',
@@ -79,6 +104,18 @@ class StokCabang extends Controller
         }
 
         $stok->update($request->all());
+
+        // Refresh to get updated data
+        $stok->refresh();
+
+        // Log update
+        AuditLogService::logUpdate(
+            'stok_cabang',
+            $stok->id_stock_cabang,
+            $oldData,
+            $stok->toArray(),
+            "Stok cabang diupdate - Produk: {$produk->nama_produk}, Cabang: {$cabang->nama_cabang}, Jumlah: {$oldData['jumlah_stok']} → {$stok->jumlah_stok}"
+        );
 
         return response()->json([
             'status' => 'success',
@@ -101,6 +138,11 @@ class StokCabang extends Controller
             ], 404);
         }
 
+        // Store old data for audit log
+        $oldData = $stok->toArray();
+        $produk = $stok->produk;
+        $cabang = $stok->cabang;
+
         // Optional: Cek apakah ada relasi detail pengeluaran
         if ($stok->detailPengeluaran()->exists()) {
             return response()->json([
@@ -110,6 +152,14 @@ class StokCabang extends Controller
         }
 
         $stok->delete();
+
+        // Log deletion
+        AuditLogService::logDelete(
+            'stok_cabang',
+            $id_stock_cabang,
+            $oldData,
+            "Stok cabang berhasil dihapus - Produk: {$produk->nama_produk}, Cabang: {$cabang->nama_cabang}, Jumlah: {$oldData['jumlah_stok']}"
+        );
 
         return response()->json([
             'status' => 'success',

@@ -14,6 +14,10 @@ use App\Http\Controllers\ProdukController;
 use App\Http\Controllers\ReportController;
 use App\Http\Controllers\TransaksiController;
 use App\Http\Controllers\PemesananController;
+use App\Http\Controllers\ReportDailyController;
+use App\Http\Controllers\BahanBakuPakaiController;
+use App\Http\Controllers\BackupController;
+use App\Http\Controllers\AuditLogController;
 
 // Rute publik
 Route::post('/super-admin/login', [AuthController::class, 'loginSuperAdmin']);
@@ -44,6 +48,36 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/reports/sales/transactions', [ReportController::class, 'salesTransactionsSuperAdmin']);
         Route::get('/reports/sales/expenses', [ReportController::class, 'salesExpensesSuperAdmin']);
         Route::get('/reports/employees', [ReportController::class, 'employeeReportSuperAdmin']);
+
+        //Daily reports
+        Route::get('/report/harian', [ReportDailyController::class, 'getDailyReport']);
+        Route::put('/report/update-status/{id}', [ReportDailyController::class, 'updateOrderStatus']);
+        Route::delete('/pengeluaran-daily/{id}', [ReportDailyController::class, 'deletePengeluaran']);
+
+        //Jenis pengeluaran
+        Route::get('/jenis-pengeluaran', [JenisPengeluaranController::class, 'index']);
+        Route::post('/jenis-pengeluaran', [JenisPengeluaranController::class, 'store']);
+        Route::put('/jenis-pengeluaran/{id_jenis}', [JenisPengeluaranController::class, 'update']);
+        Route::delete('/jenis-pengeluaran/{id_jenis}', [JenisPengeluaranController::class, 'destroy']);
+
+        //Backup database
+        Route::post('/backup', [BackupController::class, 'createBackup']);
+        Route::post('/backup-json', [BackupController::class, 'createBackupSimple']);
+        Route::get('/backup-history', [BackupController::class, 'getBackupHistory']);
+        Route::delete('/backup-history', [BackupController::class, 'clearBackupHistory']);
+
+        //Audit log
+        Route::get('/audit-logs', [AuditLogController::class, 'getAuditLogs']);
+        Route::get('/audit-logs/{tableName}', [AuditLogController::class, 'getAuditLogsByTable']);
+        Route::delete('/audit-logs/clear', [AuditLogController::class, 'clearAuditLogs']);
+        Route::get('/audit-logs/export', [AuditLogController::class, 'exportAuditLogs']);
+        Route::get('/audit-logs/cabang-list', [AuditLogController::class, 'getCabangList']);
+
+        //Bahan baku pakai
+        Route::get('/bahan-baku-pakai', [BahanBakuPakaiController::class, 'index']);
+        Route::post('/bahan-baku-pakai', [BahanBakuPakaiController::class, 'store']);
+        Route::put('/bahan-baku-pakai/{id_pemakaian}', [BahanBakuPakaiController::class, 'update']);
+        Route::delete('/bahan-baku-pakai/{id_pemakaian}', [BahanBakuPakaiController::class, 'destroy']);
 
         // Manage Admin Cabang
         Route::get('/admin-cabang', [ManageAdminCabangController::class, 'listAdmin']);
@@ -108,4 +142,9 @@ Route::middleware('auth:sanctum')->group(function () {
 
     //Bahan Baku
     Route::get('/bahan-baku', [BahanBakuController::class, 'index']); 
+
+    //Backup database routes
+    Route::post('/backup', [BackupController::class, 'createBackup']);
+    Route::post('/backup-json', [BackupController::class, 'createBackupSimple']);
+    Route::get('/backup-history', [BackupController::class, 'getBackupHistory']);
 });

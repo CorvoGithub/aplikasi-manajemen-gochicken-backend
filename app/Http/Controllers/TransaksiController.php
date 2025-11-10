@@ -8,6 +8,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use App\Services\AuditLogService;
 
 class TransaksiController extends Controller
 {
@@ -56,8 +57,16 @@ class TransaksiController extends Controller
             $kodeTransaksi = 'TRNSK-' . now()->format('d-m-Y-H:i');
 
             $totalHarga = 0;
+            $itemsDetail = [];
+            
             foreach ($request->items as $item) {
                 $totalHarga += $item['jumlah'] * $item['harga'];
+                $itemsDetail[] = [
+                    'id_produk' => $item['id_produk'],
+                    'jumlah' => $item['jumlah'],
+                    'harga' => $item['harga'],
+                    'subtotal' => $item['jumlah'] * $item['harga']
+                ];
             }
 
             // Simpan header transaksi
@@ -83,6 +92,23 @@ class TransaksiController extends Controller
                 ]);
             }
 
+            // Log creation
+            AuditLogService::logCreate(
+                'transaksi',
+                $transaksi->id_transaksi,
+                [
+                    'id_transaksi' => $transaksi->id_transaksi,
+                    'kode_transaksi' => $transaksi->kode_transaksi,
+                    'id_cabang' => $transaksi->id_cabang,
+                    'nama_pelanggan' => $transaksi->nama_pelanggan,
+                    'total_harga' => $transaksi->total_harga,
+                    'metode_pembayaran' => $transaksi->metode_pembayaran,
+                    'status_transaksi' => $transaksi->status_transaksi,
+                    'items_count' => count($request->items),
+                    'items_detail' => $itemsDetail
+                ],
+                "Transaksi baru dibuat - Kode: {$transaksi->kode_transaksi}, Pelanggan: " . ($transaksi->nama_pelanggan ?: 'Tidak ada') . ", Total: Rp " . number_format($transaksi->total_harga, 0, ',', '.')
+            );
 
             DB::commit();
 
@@ -123,6 +149,54 @@ class TransaksiController extends Controller
     }
 
     /**
+     * Update status transaksi
+     */
+    public function update(Request $request, $id_transaksi)
+    {
+        $validator = Validator::make($request->all(), [
+            'status_transaksi' => 'required|in:OnLoan,Selesai,Dibatalkan',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Validasi gagal.',
+                'errors' => $validator->errors(),
+            ], 422);
+        }
+
+        $transaksi = TransaksiModel::find($id_transaksi);
+
+        if (!$transaksi) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Transaksi tidak ditemukan.',
+            ], 404);
+        }
+
+        // Store old data for audit log
+        $oldStatus = $transaksi->status_transaksi;
+
+        $transaksi->status_transaksi = $request->status_transaksi;
+        $transaksi->save();
+
+        // Log update
+        AuditLogService::logUpdate(
+            'transaksi',
+            $transaksi->id_transaksi,
+            ['status_transaksi' => $oldStatus],
+            ['status_transaksi' => $transaksi->status_transaksi],
+            "Status transaksi {$transaksi->kode_transaksi} diupdate: {$oldStatus} → {$transaksi->status_transaksi}"
+        );
+
+        return response()->json([
+            'status' => 'success',
+            'message' => 'Status transaksi berhasil diupdate.',
+            'data' => $transaksi,
+        ]);
+    }
+
+    /**
      * Hapus transaksi beserta detailnya.
      */
     public function destroy($id_transaksi)
@@ -138,8 +212,20 @@ class TransaksiController extends Controller
 
         DB::beginTransaction();
         try {
+            // Store old data for audit log
+            $oldData = $transaksi->toArray();
+            $details = DetailTransaksiModel::where('id_transaksi', $id_transaksi)->get()->toArray();
+
             DetailTransaksiModel::where('id_transaksi', $id_transaksi)->delete();
             $transaksi->delete();
+
+            // Log deletion
+            AuditLogService::logDelete(
+                'transaksi',
+                $id_transaksi,
+                $oldData,
+                "Transaksi {$oldData['kode_transaksi']} berhasil dihapus - Pelanggan: " . ($oldData['nama_pelanggan'] ?: 'Tidak ada') . ", Total: Rp " . number_format($oldData['total_harga'], 0, ',', '.')
+            );
 
             DB::commit();
 

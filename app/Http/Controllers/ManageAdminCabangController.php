@@ -8,6 +8,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\ValidationException;
+use App\Services\AuditLogService;
 
 class ManageAdminCabangController extends Controller
 {
@@ -68,6 +69,21 @@ class ManageAdminCabangController extends Controller
             'id_cabang' => $request->id_cabang,
         ]);
 
+        // Log creation
+        AuditLogService::logCreate(
+            'users',
+            $user->id_user,
+            [
+                'id_user' => $user->id_user,
+                'nama' => $user->nama,
+                'email' => $user->email,
+                'role' => $user->role,
+                'id_cabang' => $user->id_cabang,
+                'cabang_nama' => $cabang->nama_cabang
+            ],
+            "Admin cabang {$user->nama} berhasil dibuat untuk cabang {$cabang->nama_cabang}"
+        );
+
         return response()->json([
             'status' => 'success',
             'message' => 'Akun admin cabang berhasil dibuat.',
@@ -90,8 +106,62 @@ class ManageAdminCabangController extends Controller
     }
 
     public function updateAdminCabang($id_user, Request $request) {
-        // isi logika update
-        return response()->json(['message' => 'Update logic for admin cabang.']);
+        $validator = Validator::make($request->all(), [
+            'nama' => 'required',
+            'email' => 'required',
+            'id_cabang' => 'required',
+            'password' => 'nullable',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Data tidak valid.',
+                'errors' => $validator->errors(),
+            ], 422);
+        }
+
+        $admin = UsersModel::find($id_user);
+
+        if (!$admin) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Admin tidak ditemukan.',
+            ], 404);
+        }
+
+        // Store old data for audit log
+        $oldData = $admin->toArray();
+        $oldCabang = CabangModel::find($oldData['id_cabang']);
+
+        $admin->nama = $request->nama;
+        $admin->email = $request->email;
+        $admin->id_cabang = $request->id_cabang;
+
+        // Hash password jika ada perubahan
+        if ($request->filled('password')) {
+            $admin->password = Hash::make($request->password);
+        }
+
+        $admin->save();
+
+        // Get new cabang info
+        $newCabang = CabangModel::find($request->id_cabang);
+
+        // Log update
+        AuditLogService::logUpdate(
+            'users',
+            $admin->id_user,
+            $oldData,
+            $admin->toArray(),
+            "Admin cabang {$admin->nama} diupdate - Cabang: {$oldCabang->nama_cabang} → {$newCabang->nama_cabang}"
+        );
+
+        return response()->json([
+            'status' => 'success',
+            'message' => 'Admin cabang berhasil diupdate.',
+            'data' => $admin,
+        ]);
     }
 
     public function deleteAdminCabang($id_user) {
@@ -104,7 +174,19 @@ class ManageAdminCabangController extends Controller
             ], 404);
         }
 
+        // Store old data for audit log
+        $oldData = $admin->toArray();
+        $cabang = CabangModel::find($oldData['id_cabang']);
+
         $admin->delete();
+
+        // Log deletion
+        AuditLogService::logDelete(
+            'users',
+            $id_user,
+            $oldData,
+            "Admin cabang {$oldData['nama']} berhasil dihapus dari cabang {$cabang->nama_cabang}"
+        );
 
         return response()->json([
             'status' => 'success',

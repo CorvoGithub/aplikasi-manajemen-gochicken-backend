@@ -8,6 +8,7 @@ use App\Models\DetailPengeluaranModel;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\DB;
 use Exception;
+use App\Services\AuditLogService;
 
 class PengeluaranController extends Controller
 {
@@ -75,6 +76,9 @@ class PengeluaranController extends Controller
                 }
             }
 
+            // Get jenis pengeluaran name
+            $jenisPengeluaran = DB::table('jenis_pengeluaran')->where('id_jenis', $request->id_jenis)->first();
+
             // 🔹 Tetap simpan JUMLAH TOTAL ke kolom jumlah, cicilan ke kolom cicilan_harian
             $pengeluaran = PengeluaranModel::create([
                 'id_cabang' => $request->id_cabang,
@@ -85,10 +89,13 @@ class PengeluaranController extends Controller
                 'cicilan_harian' => $cicilan_harian, // nilai per hari (jika ada)
             ]);
 
+            $stokChanges = [];
+            $detailsData = [];
+
             // 🔹 Simpan detail jika ada
             if (!empty($request->details)) {
                 foreach ($request->details as $detail) {
-                    DetailPengeluaranModel::create([
+                    $detailRecord = DetailPengeluaranModel::create([
                         'id_pengeluaran' => $pengeluaran->id_pengeluaran,
                         'id_jenis' => $request->id_jenis,
                         'id_bahan_baku' => $detail['id_bahan_baku'],
@@ -96,17 +103,45 @@ class PengeluaranController extends Controller
                         'harga_satuan' => $detail['harga_satuan'],
                         'total_harga' => $detail['jumlah_item'] * $detail['harga_satuan'],
                     ]);
-                }
 
-                // 🔹 Update stok jika jenis pengeluaran = pembelian bahan baku
-                $jenis = DB::table('jenis_pengeluaran')->where('id_jenis', $request->id_jenis)->first();
-                if ($jenis && strtolower($jenis->jenis_pengeluaran) === 'pembelian bahan baku') {
-                    foreach ($request->details as $detail) {
+                    $detailsData[] = $detailRecord->toArray();
+
+                    // 🔹 Update stok jika jenis pengeluaran = pembelian bahan baku
+                    $jenis = DB::table('jenis_pengeluaran')->where('id_jenis', $request->id_jenis)->first();
+                    if ($jenis && strtolower($jenis->jenis_pengeluaran) === 'pembelian bahan baku') {
+                        $bahanBaku = DB::table('bahan_baku')->where('id_bahan_baku', $detail['id_bahan_baku'])->first();
+                        $stokSebelum = $bahanBaku->jumlah_stok;
                         DB::table('bahan_baku')->where('id_bahan_baku', $detail['id_bahan_baku'])
                             ->increment('jumlah_stok', $detail['jumlah_item']);
+                        $stokSesudah = $stokSebelum + $detail['jumlah_item'];
+                        
+                        $stokChanges[] = [
+                            'bahan_baku' => $bahanBaku->nama_bahan,
+                            'stok_sebelum' => $stokSebelum,
+                            'stok_sesudah' => $stokSesudah,
+                            'jumlah_ditambahkan' => $detail['jumlah_item']
+                        ];
                     }
                 }
             }
+
+            // Log creation
+            AuditLogService::logCreate(
+                'pengeluaran',
+                $pengeluaran->id_pengeluaran,
+                [
+                    'id_pengeluaran' => $pengeluaran->id_pengeluaran,
+                    'id_cabang' => $pengeluaran->id_cabang,
+                    'jenis_pengeluaran' => $jenisPengeluaran->jenis_pengeluaran,
+                    'tanggal' => $pengeluaran->tanggal,
+                    'jumlah' => $pengeluaran->jumlah,
+                    'keterangan' => $pengeluaran->keterangan,
+                    'cicilan_harian' => $pengeluaran->cicilan_harian,
+                    'details' => $detailsData,
+                    'stok_changes' => $stokChanges
+                ],
+                "Pengeluaran {$jenisPengeluaran->jenis_pengeluaran} sebesar Rp " . number_format($pengeluaran->jumlah, 0, ',', '.') . " berhasil ditambahkan"
+            );
 
             DB::commit();
             return response()->json([
@@ -120,7 +155,6 @@ class PengeluaranController extends Controller
             return response()->json(['status' => 'error', 'message' => 'Terjadi kesalahan server: ' . $e->getMessage()], 500);
         }
     }
-
 
     public function update(Request $request, $id_pengeluaran)
     {
@@ -144,6 +178,10 @@ class PengeluaranController extends Controller
 
         DB::beginTransaction();
         try {
+            // Store old data for audit log
+            $oldData = $pengeluaran->toArray();
+            $oldDetails = DetailPengeluaranModel::where('id_pengeluaran', $id_pengeluaran)->get()->toArray();
+
             $cicilan_harian = null;
             if ($request->boolean('is_cicilan_harian')) {
                 $jumlah_hari_bulan_ini = cal_days_in_month(
@@ -154,6 +192,10 @@ class PengeluaranController extends Controller
                 $cicilan_harian = $request->jumlah / $jumlah_hari_bulan_ini;
             }
 
+            // Get jenis pengeluaran names
+            $oldJenis = DB::table('jenis_pengeluaran')->where('id_jenis', $oldData['id_jenis'])->first();
+            $newJenis = DB::table('jenis_pengeluaran')->where('id_jenis', $request->id_jenis)->first();
+
             // 🔹 Update data utama (jumlah tetap jumlah pengeluaran, bukan cicilan)
             $pengeluaran->update([
                 'id_jenis' => $request->id_jenis,
@@ -163,12 +205,15 @@ class PengeluaranController extends Controller
                 'cicilan_harian' => $cicilan_harian, // update cicilan harian (jika ada)
             ]);
 
+            $stokChanges = [];
+            $newDetails = [];
+
             // 🔁 Revert & update stok + detail seperti sebelumnya...
             DetailPengeluaranModel::where('id_pengeluaran', $id_pengeluaran)->delete();
 
             if (!empty($request->details)) {
                 foreach ($request->details as $detail) {
-                    DetailPengeluaranModel::create([
+                    $detailRecord = DetailPengeluaranModel::create([
                         'id_pengeluaran' => $pengeluaran->id_pengeluaran,
                         'id_jenis' => $request->id_jenis,
                         'id_bahan_baku' => $detail['id_bahan_baku'],
@@ -176,16 +221,35 @@ class PengeluaranController extends Controller
                         'harga_satuan' => $detail['harga_satuan'],
                         'total_harga' => $detail['jumlah_item'] * $detail['harga_satuan'],
                     ]);
-                }
 
-                $jenisBaru = DB::table('jenis_pengeluaran')->where('id_jenis', $request->id_jenis)->first();
-                if ($jenisBaru && strtolower($jenisBaru->jenis_pengeluaran) === 'pembelian bahan baku') {
-                    foreach ($request->details as $detail) {
+                    $newDetails[] = $detailRecord->toArray();
+
+                    $jenisBaru = DB::table('jenis_pengeluaran')->where('id_jenis', $request->id_jenis)->first();
+                    if ($jenisBaru && strtolower($jenisBaru->jenis_pengeluaran) === 'pembelian bahan baku') {
+                        $bahanBaku = DB::table('bahan_baku')->where('id_bahan_baku', $detail['id_bahan_baku'])->first();
+                        $stokSebelum = $bahanBaku->jumlah_stok;
                         DB::table('bahan_baku')->where('id_bahan_baku', $detail['id_bahan_baku'])
                             ->increment('jumlah_stok', $detail['jumlah_item']);
+                        $stokSesudah = $stokSebelum + $detail['jumlah_item'];
+                        
+                        $stokChanges[] = [
+                            'bahan_baku' => $bahanBaku->nama_bahan,
+                            'stok_sebelum' => $stokSebelum,
+                            'stok_sesudah' => $stokSesudah,
+                            'jumlah_ditambahkan' => $detail['jumlah_item']
+                        ];
                     }
                 }
             }
+
+            // Log update
+            AuditLogService::logUpdate(
+                'pengeluaran',
+                $pengeluaran->id_pengeluaran,
+                $oldData,
+                $pengeluaran->toArray(),
+                "Pengeluaran diupdate - Jenis: {$oldJenis->jenis_pengeluaran} → {$newJenis->jenis_pengeluaran}, Jumlah: Rp " . number_format($oldData['jumlah'], 0, ',', '.') . " → Rp " . number_format($pengeluaran->jumlah, 0, ',', '.')
+            );
 
             DB::commit();
             return response()->json(['status' => 'success', 'message' => 'Pengeluaran berhasil diperbarui.']);
@@ -196,52 +260,73 @@ class PengeluaranController extends Controller
         }
     }
 
-
     public function destroy($id_pengeluaran)
-{
-    $pengeluaran = PengeluaranModel::find($id_pengeluaran);
-    if (!$pengeluaran) {
-        return response()->json([
-            'status' => 'error',
-            'message' => 'Data pengeluaran tidak ditemukan.'
-        ], 404);
-    }
-
-    DB::beginTransaction();
-    try {
-        // 🧩 Cek apakah pengeluaran ini adalah "Pembelian bahan baku"
-        $jenis = DB::table('jenis_pengeluaran')->where('id_jenis', $pengeluaran->id_jenis)->first();
-
-        if ($jenis && strtolower($jenis->jenis_pengeluaran) === 'pembelian bahan baku') {
-            // Ambil semua detail pengeluaran terkait
-            $details = DB::table('detail_pengeluaran')->where('id_pengeluaran', $pengeluaran->id_pengeluaran)->get();
-
-            // Kurangi stok bahan baku sesuai jumlah_item dari tiap detail
-            foreach ($details as $detail) {
-                DB::table('bahan_baku')
-                    ->where('id_bahan_baku', $detail->id_bahan_baku)
-                    ->decrement('jumlah_stok', $detail->jumlah_item);
-            }
+    {
+        $pengeluaran = PengeluaranModel::find($id_pengeluaran);
+        if (!$pengeluaran) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Data pengeluaran tidak ditemukan.'
+            ], 404);
         }
 
-        // Hapus detail pengeluaran
-        DB::table('detail_pengeluaran')->where('id_pengeluaran', $pengeluaran->id_pengeluaran)->delete();
+        DB::beginTransaction();
+        try {
+            // Store old data for audit log
+            $oldData = $pengeluaran->toArray();
+            $oldDetails = DetailPengeluaranModel::where('id_pengeluaran', $id_pengeluaran)->get()->toArray();
+            $jenis = DB::table('jenis_pengeluaran')->where('id_jenis', $pengeluaran->id_jenis)->first();
 
-        // Hapus pengeluaran utama
-        $pengeluaran->delete();
+            $stokChanges = [];
 
-        DB::commit();
-        return response()->json([
-            'status' => 'success',
-            'message' => 'Data pengeluaran berhasil dihapus dan stok telah diperbarui.'
-        ], 200);
-    } catch (Exception $e) {
-        DB::rollBack();
-        return response()->json([
-            'status' => 'error',
-            'message' => 'Gagal menghapus data: ' . $e->getMessage()
-        ], 500);
+            // 🧩 Cek apakah pengeluaran ini adalah "Pembelian bahan baku"
+            if ($jenis && strtolower($jenis->jenis_pengeluaran) === 'pembelian bahan baku') {
+                // Ambil semua detail pengeluaran terkait
+                $details = DB::table('detail_pengeluaran')->where('id_pengeluaran', $pengeluaran->id_pengeluaran)->get();
+
+                // Kurangi stok bahan baku sesuai jumlah_item dari tiap detail
+                foreach ($details as $detail) {
+                    $bahanBaku = DB::table('bahan_baku')->where('id_bahan_baku', $detail->id_bahan_baku)->first();
+                    $stokSebelum = $bahanBaku->jumlah_stok;
+                    DB::table('bahan_baku')
+                        ->where('id_bahan_baku', $detail->id_bahan_baku)
+                        ->decrement('jumlah_stok', $detail->jumlah_item);
+                    $stokSesudah = $stokSebelum - $detail->jumlah_item;
+                    
+                    $stokChanges[] = [
+                        'bahan_baku' => $bahanBaku->nama_bahan,
+                        'stok_sebelum' => $stokSebelum,
+                        'stok_sesudah' => $stokSesudah,
+                        'jumlah_dikurangi' => $detail->jumlah_item
+                    ];
+                }
+            }
+
+            // Hapus detail pengeluaran
+            DB::table('detail_pengeluaran')->where('id_pengeluaran', $pengeluaran->id_pengeluaran)->delete();
+
+            // Hapus pengeluaran utama
+            $pengeluaran->delete();
+
+            // Log deletion
+            AuditLogService::logDelete(
+                'pengeluaran',
+                $id_pengeluaran,
+                $oldData,
+                "Pengeluaran {$jenis->jenis_pengeluaran} sebesar Rp " . number_format($oldData['jumlah'], 0, ',', '.') . " berhasil dihapus"
+            );
+
+            DB::commit();
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Data pengeluaran berhasil dihapus dan stok telah diperbarui.'
+            ], 200);
+        } catch (Exception $e) {
+            DB::rollBack();
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Gagal menghapus data: ' . $e->getMessage()
+            ], 500);
+        }
     }
-}
-
 }
