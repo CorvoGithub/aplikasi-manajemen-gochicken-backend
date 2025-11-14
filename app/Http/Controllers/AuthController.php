@@ -8,6 +8,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\ValidationException;
 
+
 class AuthController extends Controller
 {
     public function loginSuperAdmin(Request $request)
@@ -77,39 +78,53 @@ class AuthController extends Controller
         ]);
     }
 
-    /**
-     * ✨ FUNGSI BARU: Untuk login kasir dari aplikasi mobile.
-     * Hanya memvalidasi ID cabang dan password cabang.
-     */
+    //===============================================================
+    //                  FUNGSI UNTUK ANDROID
+    //===============================================================
+
     public function loginKasir(Request $request)
     {
         $request->validate([
-            'id_cabang' => 'required|exists:cabang,id_cabang',
+            'id_cabang' => 'required',
             'password_cabang' => 'required',
         ]);
 
-        $cabang = CabangModel::find($request->id_cabang);
+        $cabang = CabangModel::where('id_cabang', $request->id_cabang)->first();
 
-        // Validasi password cabang yang di-hash
         if (!$cabang || !Hash::check($request->password_cabang, $cabang->password_cabang)) {
-            return response()->json([
-                'status' => 'error',
-                'message' => 'Kombinasi cabang dan password tidak valid.',
-            ], 401);
+            throw ValidationException::withMessages([
+                'password_cabang' => ['Password cabang salah.'],
+            ]);
         }
-        
-        // Buat token sederhana untuk kasir. Token ini bisa memiliki permission terbatas.
-        // Kita gunakan model Cabang untuk membuat token agar tidak tercampur dengan user admin.
-        $token = $cabang->createToken('kasir-token', ['role:kasir'])->plainTextToken;
+
+        $user = UsersModel::where('id_cabang', $request->id_cabang)
+                            ->where('role', 'kasir')
+                            ->first();
+
+        $token = $user->createToken('auth-token')->plainTextToken;
 
         return response()->json([
             'status' => 'success',
-            'message' => 'Login berhasil!',
             'token' => $token,
-            'cabang' => [
-                'id_cabang' => $cabang->id_cabang,
-                'nama_cabang' => $cabang->nama_cabang,
-            ]
+            'user' => $user,
+            'cabang' => $cabang, // tambahan data cabang lengkap
+        ]);
+    }
+
+    public function getCurrentUser(Request $request)
+    {
+        $user = $request->user();
+        
+        if (!$user) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'User not found'
+            ], 404);
+        }
+
+        return response()->json([
+            'status' => 'success',
+            'user' => $user
         ]);
     }
 

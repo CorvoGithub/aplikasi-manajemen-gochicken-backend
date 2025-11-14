@@ -25,6 +25,13 @@ Route::post('/admin-cabang/login', [AuthController::class, 'loginAdminCabang']);
 Route::get('/cabang', [CabangController::class, 'index']);
 Route::post('/kasir/login', [AuthController::class, 'loginKasir']);
 
+// ===================================================================
+// --- RUTE KHUSUS UNTUK ANDROID APP ---
+// ===================================================================
+Route::get('/android/cabang/{id_cabang}/produk', [ProdukController::class, 'getProdukByCabangForAndroid']);
+Route::get('/current-user', [AuthController::class, 'getCurrentUser']); 
+
+
 Route::middleware('auth:sanctum')->group(function () {
     Route::get('/user', fn(Request $request) => $request->user());
     Route::post('/logout', [AuthController::class, 'logout']);
@@ -111,7 +118,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/reports/cabang/{id}/sales/transactions', [ReportController::class, 'salesTransactionsPaginated']);
     Route::get('/reports/cabang/{id}/sales/expenses', [ReportController::class, 'salesExpensesPaginated']);
     Route::get('/reports/cabang/{id}/employees', [ReportController::class, 'employeeReportPaginated']);
-
+    
     //Stocks
     Route::get('/cabang/{id_cabang}/produk', [ProdukController::class, 'getProdukByCabang']);
     Route::put('/stok-cabang/{id_stock_cabang}', [ProdukController::class, 'updateStok']);
@@ -147,4 +154,5 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/backup', [BackupController::class, 'createBackup']);
     Route::post('/backup-json', [BackupController::class, 'createBackupSimple']);
     Route::get('/backup-history', [BackupController::class, 'getBackupHistory']);
+    
 });

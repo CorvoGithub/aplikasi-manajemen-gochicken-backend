@@ -15,8 +15,8 @@ return new class extends Migration
             $table->increments('id_user');
             $table->string('nama', 100);
             $table->string('email', 50)->unique();
-            $table->string('password'); // hash
-            $table->enum('role', ['super admin', 'admin cabang']);
+            $table->string('password')->nullable(); //hash
+            $table->enum('role', ['super admin', 'admin cabang', 'kasir']);
             $table->integer('id_cabang')->nullable();
             $table->timestamps();
         });
