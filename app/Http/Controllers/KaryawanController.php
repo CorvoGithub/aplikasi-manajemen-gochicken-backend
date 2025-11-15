@@ -56,7 +56,7 @@ class KaryawanController extends Controller
         // Log creation
         AuditLogService::logCreate(
             'karyawan',
-            $karyawan->id_karyawan,
+            (string)$karyawan->id_karyawan,
             $karyawan->toArray(),
             "Karyawan {$karyawan->nama_karyawan} berhasil ditambahkan"
         );
@@ -117,7 +117,7 @@ class KaryawanController extends Controller
         // Log update
         AuditLogService::logUpdate(
             'karyawan',
-            $karyawan->id_karyawan,
+            (string)$karyawan->id_karyawan,
             $oldData,
             $karyawan->toArray(),
             "Data karyawan {$karyawan->nama_karyawan} berhasil diupdate"
@@ -152,7 +152,7 @@ class KaryawanController extends Controller
         // Log deletion
         AuditLogService::logDelete(
             'karyawan',
-            $id_karyawan,
+            (string)$id_karyawan,
             $oldData,
             "Karyawan {$oldData['nama_karyawan']} berhasil dihapus"
         );

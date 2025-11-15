@@ -47,7 +47,7 @@ class JenisPengeluaranController extends Controller
         // Log creation
         AuditLogService::logCreate(
             'jenis_pengeluaran',
-            $jenis_pengeluaran->id_jenis,
+            (string)$jenis_pengeluaran->id_jenis,
             $jenis_pengeluaran->toArray(),
             "Jenis pengeluaran {$jenis_pengeluaran->jenis_pengeluaran} berhasil ditambahkan"
         );
@@ -98,7 +98,7 @@ class JenisPengeluaranController extends Controller
         // Log update
         AuditLogService::logUpdate(
             'jenis_pengeluaran',
-            $jenis_pengeluaran->id_jenis,
+            (string)$jenis_pengeluaran->id_jenis,
             $oldData,
             $jenis_pengeluaran->toArray(),
             "Jenis pengeluaran berhasil diupdate: {$oldData['jenis_pengeluaran']} → {$jenis_pengeluaran->jenis_pengeluaran}"
@@ -133,7 +133,7 @@ class JenisPengeluaranController extends Controller
         // Log deletion
         AuditLogService::logDelete(
             'jenis_pengeluaran',
-            $id_jenis,
+            (string)$id_jenis,
             $oldData,
             "Jenis pengeluaran {$oldData['jenis_pengeluaran']} berhasil dihapus"
         );

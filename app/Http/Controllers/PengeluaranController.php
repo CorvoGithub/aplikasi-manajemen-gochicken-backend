@@ -128,7 +128,7 @@ class PengeluaranController extends Controller
             // Log creation
             AuditLogService::logCreate(
                 'pengeluaran',
-                $pengeluaran->id_pengeluaran,
+                (string)$pengeluaran->id_pengeluaran,
                 [
                     'id_pengeluaran' => $pengeluaran->id_pengeluaran,
                     'id_cabang' => $pengeluaran->id_cabang,
@@ -245,7 +245,7 @@ class PengeluaranController extends Controller
             // Log update
             AuditLogService::logUpdate(
                 'pengeluaran',
-                $pengeluaran->id_pengeluaran,
+                (string)$pengeluaran->id_pengeluaran,
                 $oldData,
                 $pengeluaran->toArray(),
                 "Pengeluaran diupdate - Jenis: {$oldJenis->jenis_pengeluaran} → {$newJenis->jenis_pengeluaran}, Jumlah: Rp " . number_format($oldData['jumlah'], 0, ',', '.') . " → Rp " . number_format($pengeluaran->jumlah, 0, ',', '.')
@@ -311,7 +311,7 @@ class PengeluaranController extends Controller
             // Log deletion
             AuditLogService::logDelete(
                 'pengeluaran',
-                $id_pengeluaran,
+                (string)$id_pengeluaran,
                 $oldData,
                 "Pengeluaran {$jenis->jenis_pengeluaran} sebesar Rp " . number_format($oldData['jumlah'], 0, ',', '.') . " berhasil dihapus"
             );

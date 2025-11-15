@@ -19,13 +19,16 @@ class AuditLogService
 
         $request = app(Request::class);
 
+        // Ensure record_id is always a string
+        $recordId = (string)$recordId;
+
         AuditLog::create([
             'table_name' => $tableName,
             'action' => $action,
             'old_data' => $oldData ? json_encode($oldData) : null,
             'new_data' => $newData ? json_encode($newData) : null,
             'record_id' => $recordId,
-            'user_id' => $user->id_user, // Use id_user
+            'user_id' => $user->id_user,
             'user_role' => $user->role,
             'ip_address' => $request->ip(),
             'user_agent' => $request->userAgent(),

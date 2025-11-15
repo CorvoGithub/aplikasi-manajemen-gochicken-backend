@@ -72,7 +72,7 @@ class ManageAdminCabangController extends Controller
         // Log creation
         AuditLogService::logCreate(
             'users',
-            $user->id_user,
+            (string)$user->id_user,
             [
                 'id_user' => $user->id_user,
                 'nama' => $user->nama,
@@ -151,7 +151,7 @@ class ManageAdminCabangController extends Controller
         // Log update
         AuditLogService::logUpdate(
             'users',
-            $admin->id_user,
+            (string)$admin->id_user,
             $oldData,
             $admin->toArray(),
             "Admin cabang {$admin->nama} diupdate - Cabang: {$oldCabang->nama_cabang} → {$newCabang->nama_cabang}"
@@ -183,7 +183,7 @@ class ManageAdminCabangController extends Controller
         // Log deletion
         AuditLogService::logDelete(
             'users',
-            $id_user,
+            (string)$id_user,
             $oldData,
             "Admin cabang {$oldData['nama']} berhasil dihapus dari cabang {$cabang->nama_cabang}"
         );

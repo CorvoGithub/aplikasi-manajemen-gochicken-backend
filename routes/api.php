@@ -8,6 +8,7 @@ use App\Http\Controllers\CabangController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\JenisPengeluaranController;
 use App\Http\Controllers\KaryawanController;
+use App\Http\Controllers\KasirController;
 use App\Http\Controllers\ManageAdminCabangController;
 use App\Http\Controllers\PengeluaranController;
 use App\Http\Controllers\ProdukController;
@@ -26,7 +27,7 @@ Route::get('/cabang', [CabangController::class, 'index']);
 Route::post('/kasir/login', [AuthController::class, 'loginKasir']);
 
 // ===================================================================
-// --- RUTE KHUSUS UNTUK ANDROID APP ---
+// --- RUTE KHUSUS UNTUK ANDROID ---
 // ===================================================================
 Route::get('/android/cabang/{id_cabang}/produk', [ProdukController::class, 'getProdukByCabangForAndroid']);
 Route::get('/current-user', [AuthController::class, 'getCurrentUser']); 
@@ -128,6 +129,12 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/karyawan', [KaryawanController::class, 'store']);
     Route::put('/karyawan/{id_karyawan}', [KaryawanController::class, 'update']);
     Route::delete('/karyawan/{id_karyawan}', [KaryawanController::class, 'destroy']);
+
+    //Kasir
+    Route::get('/cabang/{id_cabang}/kasir', [KasirController::class, 'getKasirByCabang']);
+    Route::post('/kasir', [KasirController::class, 'store']);
+    Route::put('/kasir/{id_user}', [KasirController::class, 'update']);
+    Route::delete('/kasir/{id_user}', [KasirController::class, 'destroy']);
 
     //Pengeluaran
     Route::get('/cabang/{id_cabang}/pengeluaran', [PengeluaranController::class, 'getPengeluaranByCabang']);

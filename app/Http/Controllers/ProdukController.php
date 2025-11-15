@@ -66,7 +66,7 @@ class ProdukController extends Controller
         // Log creation
         AuditLogService::logCreate(
             'produk',
-            $produk->id_produk,
+            (string)$produk->id_produk,
             $produk->toArray(),
             "Produk {$produk->nama_produk} berhasil ditambahkan dengan harga Rp " . number_format($produk->harga, 0, ',', '.')
         );
@@ -135,7 +135,7 @@ class ProdukController extends Controller
         // Log update
         AuditLogService::logUpdate(
             'produk',
-            $produk->id_produk,
+            (string)$produk->id_produk,
             $oldData,
             $produk->toArray(),
             "Produk {$produk->nama_produk} berhasil diupdate - Harga: Rp " . number_format($oldData['harga'], 0, ',', '.') . " → Rp " . number_format($produk->harga, 0, ',', '.')
@@ -170,7 +170,7 @@ class ProdukController extends Controller
         // Log deletion
         AuditLogService::logDelete(
             'produk',
-            $id_produk,
+            (string)$id_produk,
             $oldData,
             "Produk {$oldData['nama_produk']} berhasil dihapus"
         );
@@ -258,7 +258,7 @@ class ProdukController extends Controller
             // Log stock update
             AuditLogService::logUpdate(
                 'stok_cabang',
-                $stok->id_stock_cabang,
+                (string)$stok->id_stock_cabang,
                 ['jumlah_stok' => $oldStok],
                 ['jumlah_stok' => $stok->jumlah_stok],
                 "Stok produk {$produk->nama_produk} diupdate: {$oldStok} → {$stok->jumlah_stok} (Perubahan: {$request->jumlah})"

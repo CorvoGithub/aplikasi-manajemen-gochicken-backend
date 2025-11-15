@@ -51,7 +51,7 @@ class StokCabang extends Controller
         // Log creation
         AuditLogService::logCreate(
             'stok_cabang',
-            $stok->id_stock_cabang,
+            (string)$stok->id_stock_cabang,
             [
                 'id_stock_cabang' => $stok->id_stock_cabang,
                 'id_cabang' => $stok->id_cabang,
@@ -111,7 +111,7 @@ class StokCabang extends Controller
         // Log update
         AuditLogService::logUpdate(
             'stok_cabang',
-            $stok->id_stock_cabang,
+            (string)$stok->id_stock_cabang,
             $oldData,
             $stok->toArray(),
             "Stok cabang diupdate - Produk: {$produk->nama_produk}, Cabang: {$cabang->nama_cabang}, Jumlah: {$oldData['jumlah_stok']} → {$stok->jumlah_stok}"
@@ -156,7 +156,7 @@ class StokCabang extends Controller
         // Log deletion
         AuditLogService::logDelete(
             'stok_cabang',
-            $id_stock_cabang,
+            (string)$id_stock_cabang,
             $oldData,
             "Stok cabang berhasil dihapus - Produk: {$produk->nama_produk}, Cabang: {$cabang->nama_cabang}, Jumlah: {$oldData['jumlah_stok']}"
         );

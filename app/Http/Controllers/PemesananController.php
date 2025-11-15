@@ -119,7 +119,7 @@ class PemesananController extends Controller
             // Log creation
             AuditLogService::logCreate(
                 'transaksi',
-                $transaksi->id_transaksi,
+                (string)$transaksi->id_transaksi,
                 [
                     'id_transaksi' => $transaksi->id_transaksi,
                     'kode_transaksi' => $transaksi->kode_transaksi,
@@ -166,7 +166,7 @@ class PemesananController extends Controller
         // Log update
         AuditLogService::logUpdate(
             'transaksi',
-            $transaksi->id_transaksi,
+            (string)$transaksi->id_transaksi,
             ['status_transaksi' => $oldStatus],
             ['status_transaksi' => $transaksi->status_transaksi],
             "Status pemesanan {$transaksi->kode_transaksi} diupdate: {$oldStatus} → {$transaksi->status_transaksi}"
@@ -210,7 +210,7 @@ class PemesananController extends Controller
             // Log deletion
             AuditLogService::logDelete(
                 'transaksi',
-                $id_transaksi,
+                (string)$id_transaksi,
                 $oldData,
                 "Pemesanan {$oldData['kode_transaksi']} untuk pelanggan {$oldData['nama_pelanggan']} berhasil dihapus. Stok dikembalikan."
             );

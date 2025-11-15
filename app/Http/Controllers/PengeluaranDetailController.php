@@ -52,7 +52,7 @@ class DetailPengeluaranController extends Controller
         // Log creation
         AuditLogService::logCreate(
             'detail_pengeluaran',
-            $detail->id_detail_pengeluaran,
+            (string)$detail->id_detail_pengeluaran,
             $detail->toArray(),
             "Detail pengeluaran berhasil ditambahkan untuk pengeluaran ID {$detail->id_pengeluaran}"
         );
@@ -107,7 +107,7 @@ class DetailPengeluaranController extends Controller
         // Log update
         AuditLogService::logUpdate(
             'detail_pengeluaran',
-            $detail->id_detail_pengeluaran,
+            (string)$detail->id_detail_pengeluaran,
             $oldData,
             $detail->toArray(),
             "Detail pengeluaran ID {$detail->id_detail_pengeluaran} berhasil diupdate"
@@ -142,7 +142,7 @@ class DetailPengeluaranController extends Controller
         // Log deletion
         AuditLogService::logDelete(
             'detail_pengeluaran',
-            $id_detail_pengeluaran,
+            (string)$id_detail_pengeluaran,
             $oldData,
             "Detail pengeluaran ID {$id_detail_pengeluaran} berhasil dihapus dari pengeluaran ID {$oldData['id_pengeluaran']}"
         );

@@ -6,6 +6,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
 use App\Services\AuditLogService;
+use Illuminate\Support\Facades\Log;
 
 class BahanBakuPakaiController extends Controller
 {
@@ -46,12 +47,13 @@ class BahanBakuPakaiController extends Controller
             'tanggal' => 'required|date',
             'id_bahan_baku' => 'required|exists:bahan_baku,id_bahan_baku',
             'jumlah_pakai' => 'required|numeric|min:0.01',
-            'catatan' => 'nullable',
+            'catatan' => 'nullable|string',
         ]);
 
         if ($validator->fails()) {
             return response()->json([
                 'status' => 'error',
+                'message' => 'Validasi gagal',
                 'errors' => $validator->errors(),
             ], 422);
         }
@@ -67,25 +69,47 @@ class BahanBakuPakaiController extends Controller
 
             if (!$bahanBaku) {
                 DB::rollBack();
-                return response()->json(['status' => 'error', 'message' => 'Bahan baku tidak ditemukan.'], 404);
+                return response()->json([
+                    'status' => 'error', 
+                    'message' => 'Bahan baku tidak ditemukan.'
+                ], 404);
             }
 
-            // Ganti ->jumlah ke ->stok (pastikan kolom DB bernama 'stok')
-            $stokSkrg = (float) $bahanBaku->jumlah_stok;
+            // Debug: Check what columns are available
+            // Uncomment the next line to see the structure of bahanBaku
+            // logger()->info('Bahan Baku Data:', (array) $bahanBaku);
+
+            // Check available stock column - try different possible column names
+            $stokColumn = null;
+            if (isset($bahanBaku->jumlah_stok)) {
+                $stokColumn = 'jumlah_stok';
+            } elseif (isset($bahanBaku->stok)) {
+                $stokColumn = 'stok';
+            } elseif (isset($bahanBaku->jumlah)) {
+                $stokColumn = 'jumlah';
+            } else {
+                DB::rollBack();
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Kolom stok tidak ditemukan dalam data bahan baku.'
+                ], 500);
+            }
+
+            $stokSkrg = (float) $bahanBaku->$stokColumn;
             $pakai = (float) $request->jumlah_pakai;
 
             if ($stokSkrg < $pakai) {
                 DB::rollBack();
                 return response()->json([
                     'status' => 'error',
-                    'message' => 'Stok bahan baku tidak mencukupi. Stok saat ini: ' . $stokSkrg,
+                    'message' => 'Stok bahan baku tidak mencukupi. Stok saat ini: ' . $stokSkrg . ', yang dibutuhkan: ' . $pakai,
                 ], 400);
             }
 
             // Kurangi stok
             DB::table('bahan_baku')
                 ->where('id_bahan_baku', $request->id_bahan_baku)
-                ->update(['jumlah_stok' => $stokSkrg - $pakai]);
+                ->update([$stokColumn => $stokSkrg - $pakai]);
 
             // Simpan pemakaian harian
             $idPemakaian = DB::table('bahan_baku_harian')->insertGetId([
@@ -93,6 +117,8 @@ class BahanBakuPakaiController extends Controller
                 'id_bahan_baku' => $request->id_bahan_baku,
                 'jumlah_pakai' => $request->jumlah_pakai,
                 'catatan' => $request->catatan,
+                'created_at' => now(),
+                'updated_at' => now(),
             ]);
 
             // Get the created record for audit log
@@ -103,7 +129,7 @@ class BahanBakuPakaiController extends Controller
             // Log creation
             AuditLogService::logCreate(
                 'bahan_baku_harian',
-                $idPemakaian,
+                (string) $idPemakaian,
                 [
                     'id_pemakaian' => $idPemakaian,
                     'tanggal' => $request->tanggal,
@@ -114,7 +140,7 @@ class BahanBakuPakaiController extends Controller
                     'stok_sebelum' => $stokSkrg,
                     'stok_sesudah' => $stokSkrg - $pakai
                 ],
-                "Pemakaian bahan baku {$bahanBaku->nama_baku} sejumlah {$request->jumlah_pakai} {$bahanBaku->satuan} berhasil dicatat"
+                "Pemakaian bahan baku {$bahanBaku->nama_bahan} sejumlah {$request->jumlah_pakai} {$bahanBaku->satuan} berhasil dicatat"
             );
 
             DB::commit();
@@ -122,9 +148,17 @@ class BahanBakuPakaiController extends Controller
             return response()->json([
                 'status' => 'success',
                 'message' => 'Pemakaian bahan baku berhasil disimpan dan stok diperbarui.',
+                'data' => [
+                    'id_pemakaian' => $idPemakaian,
+                    'stok_terbaru' => $stokSkrg - $pakai
+                ]
             ], 201);
+
         } catch (\Exception $e) {
             DB::rollBack();
+            \Log::error('Store Bahan Baku Pakai Error: ' . $e->getMessage());
+            \Log::error('Stack Trace: ' . $e->getTraceAsString());
+            
             return response()->json([
                 'status' => 'error',
                 'message' => 'Terjadi kesalahan saat menyimpan: ' . $e->getMessage(),
@@ -141,12 +175,13 @@ class BahanBakuPakaiController extends Controller
             'tanggal' => 'required|date',
             'id_bahan_baku' => 'required|exists:bahan_baku,id_bahan_baku',
             'jumlah_pakai' => 'required|numeric|min:0.01',
-            'catatan' => 'nullable',
+            'catatan' => 'nullable|string',
         ]);
 
         if ($validator->fails()) {
             return response()->json([
                 'status' => 'error',
+                'message' => 'Validasi gagal',
                 'errors' => $validator->errors(),
             ], 422);
         }
@@ -161,7 +196,10 @@ class BahanBakuPakaiController extends Controller
 
             if (!$oldPemakaian) {
                 DB::rollBack();
-                return response()->json(['status' => 'error', 'message' => 'Data pemakaian tidak ditemukan.'], 404);
+                return response()->json([
+                    'status' => 'error', 
+                    'message' => 'Data pemakaian tidak ditemukan.'
+                ], 404);
             }
 
             $bahanBaku = DB::table('bahan_baku')
@@ -171,16 +209,41 @@ class BahanBakuPakaiController extends Controller
 
             if (!$bahanBaku) {
                 DB::rollBack();
-                return response()->json(['status' => 'error', 'message' => 'Bahan baku tidak ditemukan.'], 404);
+                return response()->json([
+                    'status' => 'error', 
+                    'message' => 'Bahan baku tidak ditemukan.'
+                ], 404);
             }
 
-            // Kembalikan stok lama
-            DB::table('bahan_baku')
+            // Check stock column
+            $stokColumn = null;
+            if (isset($bahanBaku->jumlah_stok)) {
+                $stokColumn = 'jumlah_stok';
+            } elseif (isset($bahanBaku->stok)) {
+                $stokColumn = 'stok';
+            } elseif (isset($bahanBaku->jumlah)) {
+                $stokColumn = 'jumlah';
+            } else {
+                DB::rollBack();
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Kolom stok tidak ditemukan dalam data bahan baku.'
+                ], 500);
+            }
+
+            // Kembalikan stok lama (from old bahan baku)
+            $oldBahanBaku = DB::table('bahan_baku')
                 ->where('id_bahan_baku', $oldPemakaian->id_bahan_baku)
-                ->increment('jumlah_stok', $oldPemakaian->jumlah_pakai);
+                ->first();
+                
+            if ($oldBahanBaku) {
+                DB::table('bahan_baku')
+                    ->where('id_bahan_baku', $oldPemakaian->id_bahan_baku)
+                    ->increment($stokColumn, $oldPemakaian->jumlah_pakai);
+            }
 
             // Kurangi stok baru
-            $stokSkrg = (float) $bahanBaku->jumlah_stok;
+            $stokSkrg = (float) $bahanBaku->$stokColumn;
             $pakai = (float) $request->jumlah_pakai;
 
             if ($stokSkrg < $pakai) {
@@ -193,7 +256,7 @@ class BahanBakuPakaiController extends Controller
 
             DB::table('bahan_baku')
                 ->where('id_bahan_baku', $request->id_bahan_baku)
-                ->update(['jumlah_stok' => $stokSkrg - $pakai]);
+                ->update([$stokColumn => $stokSkrg - $pakai]);
 
             // Update pemakaian
             DB::table('bahan_baku_harian')
@@ -203,6 +266,7 @@ class BahanBakuPakaiController extends Controller
                     'id_bahan_baku' => $request->id_bahan_baku,
                     'jumlah_pakai' => $request->jumlah_pakai,
                     'catatan' => $request->catatan,
+                    'updated_at' => now(),
                 ]);
 
             // Get updated data for audit log
@@ -213,7 +277,7 @@ class BahanBakuPakaiController extends Controller
             // Log update
             AuditLogService::logUpdate(
                 'bahan_baku_harian',
-                $id_pemakaian,
+                (string) $id_pemakaian,
                 (array) $oldPemakaian,
                 (array) $newPemakaian,
                 "Pemakaian bahan baku diupdate - Jumlah: {$oldPemakaian->jumlah_pakai} → {$request->jumlah_pakai}"
@@ -225,8 +289,11 @@ class BahanBakuPakaiController extends Controller
                 'status' => 'success',
                 'message' => 'Pemakaian bahan baku berhasil diupdate.',
             ]);
+
         } catch (\Exception $e) {
             DB::rollBack();
+            \Log::error('Update Bahan Baku Pakai Error: ' . $e->getMessage());
+            
             return response()->json([
                 'status' => 'error',
                 'message' => 'Terjadi kesalahan saat mengupdate: ' . $e->getMessage(),
@@ -244,34 +311,72 @@ class BahanBakuPakaiController extends Controller
             $row = DB::table('bahan_baku_harian')->where('id_pemakaian', $id_pemakaian)->first();
             if (!$row) { 
                 DB::rollBack(); 
-                return response()->json(['status'=>'error','message'=>'Data tidak ditemukan'],404); 
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Data tidak ditemukan'
+                ], 404); 
             }
 
             // Get bahan baku info for audit log
             $bahanBaku = DB::table('bahan_baku')->where('id_bahan_baku', $row->id_bahan_baku)->first();
 
+            if (!$bahanBaku) {
+                DB::rollBack();
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Data bahan baku tidak ditemukan'
+                ], 404);
+            }
+
             // Store old data for audit log
             $oldData = (array) $row;
 
-            // kembalikan stok
-            DB::table('bahan_baku')->where('id_bahan_baku', $row->id_bahan_baku)->increment('jumlah_stok', $row->jumlah_pakai);
+            // Check stock column
+            $stokColumn = null;
+            if (isset($bahanBaku->jumlah_stok)) {
+                $stokColumn = 'jumlah_stok';
+            } elseif (isset($bahanBaku->stok)) {
+                $stokColumn = 'stok';
+            } elseif (isset($bahanBaku->jumlah)) {
+                $stokColumn = 'jumlah';
+            } else {
+                DB::rollBack();
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Kolom stok tidak ditemukan dalam data bahan baku.'
+                ], 500);
+            }
 
-            // hapus record pemakaian
+            // Kembalikan stok
+            DB::table('bahan_baku')
+                ->where('id_bahan_baku', $row->id_bahan_baku)
+                ->increment($stokColumn, $row->jumlah_pakai);
+
+            // Hapus record pemakaian
             DB::table('bahan_baku_harian')->where('id_pemakaian', $id_pemakaian)->delete();
 
             // Log deletion
             AuditLogService::logDelete(
                 'bahan_baku_harian',
-                $id_pemakaian,
+                (string) $id_pemakaian,
                 $oldData,
                 "Pemakaian bahan baku {$bahanBaku->nama_bahan} sejumlah {$row->jumlah_pakai} {$bahanBaku->satuan} berhasil dihapus"
             );
 
             DB::commit();
-            return response()->json(['status'=>'success','message'=>'Pemakaian berhasil dihapus dan stok dikembalikan.']);
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Pemakaian berhasil dihapus dan stok dikembalikan.'
+            ]);
+
         } catch (\Exception $e) {
             DB::rollBack();
-            return response()->json(['status'=>'error','message'=>'Gagal menghapus: '.$e->getMessage()],500);
+            \Log::error('Delete Bahan Baku Pakai Error: ' . $e->getMessage());
+            
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Gagal menghapus: ' . $e->getMessage()
+            ], 500);
         }
     }
 }

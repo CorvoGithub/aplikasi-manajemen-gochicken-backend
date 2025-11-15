@@ -47,7 +47,7 @@ class BahanBakuController extends Controller
         // Log creation
         AuditLogService::logCreate(
             'bahan_baku',
-            $bahan->id_bahan_baku,
+            (string)$bahan->id_bahan_baku,
             $bahan->toArray(),
             "Bahan baku {$bahan->nama_bahan} berhasil ditambahkan"
         );
@@ -99,7 +99,7 @@ class BahanBakuController extends Controller
         // Log update
         AuditLogService::logUpdate(
             'bahan_baku',
-            $bahan->id_bahan_baku,
+            (string)$bahan->id_bahan_baku,
             $oldData,
             $bahan->toArray(),
             "Bahan baku {$bahan->nama_bahan} berhasil diupdate"
@@ -142,7 +142,7 @@ class BahanBakuController extends Controller
         // Log deletion
         AuditLogService::logDelete(
             'bahan_baku',
-            $id_bahan_baku,
+            (string)$id_bahan_baku,
             $oldData,
             "Bahan baku {$oldData['nama_bahan']} berhasil dihapus"
         );

@@ -53,7 +53,7 @@ class CabangController extends Controller
         // Log creation
         AuditLogService::logCreate(
             'cabang',
-            $cabang->id_cabang,
+            (string)$cabang->id_cabang,
             $cabang->toArray(),
             "Cabang {$cabang->nama_cabang} berhasil ditambahkan"
         );
@@ -114,7 +114,7 @@ class CabangController extends Controller
         // Log update
         AuditLogService::logUpdate(
             'cabang',
-            $cabang->id_cabang,
+            (string)$cabang->id_cabang,
             $oldData,
             $cabang->toArray(),
             "Data cabang {$cabang->nama_cabang} berhasil diupdate"
@@ -149,7 +149,7 @@ class CabangController extends Controller
         // Log deletion
         AuditLogService::logDelete(
             'cabang',
-            $id_cabang,
+            (string)$id_cabang,
             $oldData,
             "Cabang {$oldData['nama_cabang']} berhasil dihapus"
         );
