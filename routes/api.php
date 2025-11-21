@@ -19,6 +19,7 @@ use App\Http\Controllers\ReportDailyController;
 use App\Http\Controllers\BahanBakuPakaiController;
 use App\Http\Controllers\BackupController;
 use App\Http\Controllers\AuditLogController;
+use App\Http\Controllers\AndroidTransaksiController;
 
 // Rute publik
 Route::post('/super-admin/login', [AuthController::class, 'loginSuperAdmin']);
@@ -31,6 +32,8 @@ Route::post('/kasir/login', [AuthController::class, 'loginKasir']);
 // ===================================================================
 Route::get('/android/cabang/{id_cabang}/produk', [ProdukController::class, 'getProdukByCabangForAndroid']);
 Route::get('/current-user', [AuthController::class, 'getCurrentUser']); 
+Route::post('/transaksi', [App\Http\Controllers\AndroidTransaksiController::class, 'store']);
+Route::get('/cabang/{id_cabang}/transaksi', [App\Http\Controllers\AndroidTransaksiController::class, 'getTransaksiByCabang']);
 
 
 Route::middleware('auth:sanctum')->group(function () {

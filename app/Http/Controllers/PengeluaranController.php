@@ -168,7 +168,7 @@ class PengeluaranController extends Controller
         ]);
 
         if ($validator->fails()) {
-            return response()->json(['status' => 'error', 'message' => 'Validasi gagal.', 'errors' => $validator->errors()], 422);
+            return response()->json(['status' => 'error', 'message' => 'Validasi gagal. Pastikan keterangan pengeluaran sesuai syarat.', 'errors' => $validator->errors()], 422);
         }
 
         $pengeluaran = PengeluaranModel::find($id_pengeluaran);

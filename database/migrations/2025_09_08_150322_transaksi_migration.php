@@ -17,6 +17,7 @@ return new class extends Migration
             $table->dateTime('tanggal_waktu')->useCurrent();
             $table->decimal('total_harga', 12, 2);
             $table->string('metode_pembayaran', 50)->nullable();
+            $table->enum('source', ['android', 'manual'])->default('manual');
             $table->enum('status_transaksi', ['Selesai', 'OnLoan'])->default('Selesai');
             $table->string('nama_pelanggan', 100)->nullable();
             $table->string('id_cabang')->nullable();

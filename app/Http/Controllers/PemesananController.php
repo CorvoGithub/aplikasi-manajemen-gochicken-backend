@@ -22,6 +22,11 @@ class PemesananController extends Controller
             ->whereNotNull('nama_pelanggan')
             ->with(['details.produk']);
 
+        // Filter by source (android vs manual)
+        if ($request->has('source') && $request->source !== 'semua') {
+            $query->where('source', $request->source);
+        }
+
         if ($request->has('status') && $request->status !== 'semua') {
             $query->where('status_transaksi', $request->status);
         }
@@ -73,9 +78,11 @@ class PemesananController extends Controller
                 ];
             }
             
-            // ✨ PERBAIKAN: Membuat format kode transaksi yang benar
+            // Generate transaction code: TRNSK-{DDMMYYYY}-{HHMM}
             $today = Carbon::now();
-            $kodeTransaksi = 'TRNSK-' . $today->format('dmY-Hi');
+            $datePart = $today->format('dmY'); // DDMMYYYY
+            $timePart = $today->format('Hi');   // HHMM (24-hour format)
+            $kodeTransaksi = "TRNSK-{$datePart}-{$timePart}";
 
             $transaksi = TransaksiModel::create([
                 'id_cabang' => $request->id_cabang,
@@ -85,6 +92,7 @@ class PemesananController extends Controller
                 'status_transaksi' => $request->status_transaksi,
                 'total_harga' => $totalHarga,
                 'kode_transaksi' => $kodeTransaksi,
+                'source' => 'manual', // Manual orders from website
             ]);
 
             $stokChanges = [];
@@ -128,10 +136,11 @@ class PemesananController extends Controller
                     'total_harga' => $transaksi->total_harga,
                     'status_transaksi' => $transaksi->status_transaksi,
                     'metode_pembayaran' => $transaksi->metode_pembayaran,
+                    'source' => $transaksi->source,
                     'detail_produk' => $detailProduk,
                     'stok_changes' => $stokChanges
                 ],
-                "Pemesanan baru dibuat untuk pelanggan {$transaksi->nama_pelanggan} dengan total Rp " . number_format($transaksi->total_harga, 0, ',', '.')
+                "Pemesanan manual baru dibuat untuk pelanggan {$transaksi->nama_pelanggan} dengan total Rp " . number_format($transaksi->total_harga, 0, ',', '.')
             );
 
             DB::commit();
@@ -169,7 +178,7 @@ class PemesananController extends Controller
             (string)$transaksi->id_transaksi,
             ['status_transaksi' => $oldStatus],
             ['status_transaksi' => $transaksi->status_transaksi],
-            "Status pemesanan {$transaksi->kode_transaksi} diupdate: {$oldStatus} → {$transaksi->status_transaksi}"
+            "Status pemesanan {$transaksi->kode_transaksi} ({$transaksi->source}) diupdate: {$oldStatus} → {$transaksi->status_transaksi}"
         );
 
         return response()->json(['status' => 'success', 'message' => 'Status pemesanan berhasil diupdate.']);
@@ -180,6 +189,11 @@ class PemesananController extends Controller
         
         if (!$transaksi) { 
             return response()->json(['status' => 'error', 'message' => 'Transaksi tidak ditemukan.'], 404); 
+        }
+        
+        // Check if transaction is from Android
+        if ($transaksi->source === 'android') {
+            return response()->json(['status' => 'error', 'message' => 'Transaksi dari Android tidak dapat dihapus.'], 403);
         }
         
         DB::beginTransaction();
@@ -212,7 +226,7 @@ class PemesananController extends Controller
                 'transaksi',
                 (string)$id_transaksi,
                 $oldData,
-                "Pemesanan {$oldData['kode_transaksi']} untuk pelanggan {$oldData['nama_pelanggan']} berhasil dihapus. Stok dikembalikan."
+                "Pemesanan {$oldData['kode_transaksi']} ({$oldData['source']}) untuk pelanggan {$oldData['nama_pelanggan']} berhasil dihapus. Stok dikembalikan."
             );
 
             DB::commit();

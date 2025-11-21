@@ -22,6 +22,7 @@ class TransaksiModel extends Model
         'status_transaksi',
         'nama_pelanggan',
         'id_cabang',
+        'source',
     ];
 
     // Relasi ke User

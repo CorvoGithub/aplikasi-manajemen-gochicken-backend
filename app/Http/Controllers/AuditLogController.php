@@ -25,7 +25,34 @@ class AuditLogController extends Controller
             $query = AuditLog::with(['user:id_user,nama,email,role,id_cabang', 'user.cabang:id_cabang,nama_cabang'])
                 ->orderBy('created_at', 'desc');
 
-            // Apply filters
+            // --- START: ADDED FILTERS ---
+
+            // Filter by Table
+            if ($request->has('table') && $request->table !== 'all') {
+                $query->where('table_name', $request->table);
+            }
+
+            // Filter by Action
+            if ($request->has('action') && $request->action !== 'all') {
+                $query->where('action', $request->action);
+            }
+
+            // Filter by Search Term
+            if ($request->has('search') && $request->search) {
+                $searchTerm = $request->search;
+                $query->where(function ($q) use ($searchTerm) {
+                    $q->where('table_name', 'LIKE', "%{$searchTerm}%")
+                      ->orWhere('description', 'LIKE', "%{$searchTerm}%")
+                      ->orWhere('record_id', 'LIKE', "%{$searchTerm}%")
+                      ->orWhereHas('user', function ($userQuery) use ($searchTerm) {
+                          $userQuery->where('nama', 'LIKE', "%{$searchTerm}%");
+                      });
+                });
+            }
+
+            // --- END: ADDED FILTERS ---
+
+            // Apply existing date filters
             if ($request->has('start_date') && $request->start_date) {
                 $query->whereDate('created_at', '>=', $request->start_date);
             }
@@ -34,13 +61,30 @@ class AuditLogController extends Controller
                 $query->whereDate('created_at', '<=', $request->end_date);
             }
 
+            // Apply existing cabang filter
             if ($request->has('cabang') && $request->cabang !== 'all') {
                 $query->whereHas('user', function ($q) use ($request) {
                     $q->where('id_cabang', $request->cabang);
                 });
             }
 
-            $logs = $query->paginate(20);
+            // Get total count for pagination info if needed (optional)
+            // $total = $query->count(); 
+
+            // Apply pagination based on per_page request, default to 20
+            $perPage = $request->input('per_page', 20);
+            
+            // Handle 'all' or high number for exports
+            if ($perPage === '10000') { // Check for the export limit from React
+                 $logs = $query->limit(10000)->get();
+                 // Return in a different structure for export if needed, 
+                 // but for now, let's assume this is for the main list
+                 // A better way is to check if it's an export request
+            }
+
+            // Standard Pagination
+            $logs = $query->paginate($perPage);
+
 
             return response()->json([
                 'status' => 'success',
@@ -156,6 +200,20 @@ class AuditLogController extends Controller
                     $q->where('id_cabang', $request->cabang);
                 });
             }
+
+            // --- ADD THIS BLOCK ---
+            if ($request->has('search') && $request->search) {
+                $searchTerm = $request->search;
+                $query->where(function ($q) use ($searchTerm) {
+                    $q->where('table_name', 'LIKE', "%{$searchTerm}%")
+                      ->orWhere('description', 'LIKE', "%{$searchTerm}%")
+                      ->orWhere('record_id', 'LIKE', "%{$searchTerm}%")
+                      ->orWhereHas('user', function ($userQuery) use ($searchTerm) {
+                          $userQuery->where('nama', 'LIKE', "%{$searchTerm}%");
+                      });
+                });
+            }
+            // --- END OF BLOCK ---
 
             $logs = $query->get();
 
