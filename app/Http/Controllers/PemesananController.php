@@ -31,6 +31,19 @@ class PemesananController extends Controller
             $query->where('status_transaksi', $request->status);
         }
 
+        // Search functionality
+        if ($request->has('search') && !empty($request->search)) {
+            $searchTerm = $request->search;
+            $query->where(function($q) use ($searchTerm) {
+                $q->where('kode_transaksi', 'like', "%{$searchTerm}%")
+                  ->orWhere('nama_pelanggan', 'like', "%{$searchTerm}%")
+                  ->orWhere('metode_pembayaran', 'like', "%{$searchTerm}%")
+                  ->orWhereHas('details.produk', function($subQuery) use ($searchTerm) {
+                      $subQuery->where('nama_produk', 'like', "%{$searchTerm}%");
+                  });
+            });
+        }
+
         $filter = $request->query('filter');
         if ($filter === 'minggu') {
             $query->whereBetween('tanggal_waktu', [Carbon::now()->startOfWeek(), Carbon::now()->endOfWeek()]);
