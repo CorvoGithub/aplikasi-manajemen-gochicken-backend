@@ -75,6 +75,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/backup', [BackupController::class, 'createBackup']);
         Route::post('/backup-json', [BackupController::class, 'createBackupSimple']);
         Route::get('/backup-history', [BackupController::class, 'getBackupHistory']);
+        Route::post('/backup-import', [BackupController::class, 'importDatabase']); 
         Route::delete('/backup-history', [BackupController::class, 'clearBackupHistory']);
 
         //Audit log

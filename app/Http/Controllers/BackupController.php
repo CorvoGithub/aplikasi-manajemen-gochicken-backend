@@ -109,6 +109,355 @@ class BackupController extends Controller
     }
 
     /**
+     * Import database from SQL file
+     */
+    public function importDatabase(Request $request)
+    {
+        try {
+            $user = $request->user();
+            if (!$user) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Unauthorized'
+                ], 401);
+            }
+
+            // Only super admin can import database
+            if ($user->role !== 'super admin') {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Unauthorized - Only super admin can import database'
+                ], 403);
+            }
+
+            $request->validate([
+                'sql_file' => 'required|file|mimes:sql,txt|max:102400', // 100MB max
+            ]);
+
+            $file = $request->file('sql_file');
+            $filename = $file->getClientOriginalName();
+            $tempPath = $file->getRealPath();
+
+            // Create import history record
+            $importHistory = BackupHistory::create([
+                'filename' => $filename,
+                'file_type' => 'sql_import',
+                'file_size' => $file->getSize(),
+                'backup_type' => 'import',
+                'user_id' => $user->id_user,
+                'user_role' => $user->role,
+                'success' => false,
+            ]);
+
+            // Try command line method first, fallback to PHP method
+            try {
+                $result = $this->importUsingCommandLine($tempPath, $importHistory);
+            } catch (\Exception $e) {
+                Log::warning('Command line import failed, trying PHP method: ' . $e->getMessage());
+                $result = $this->importUsingPhp($tempPath, $importHistory);
+            }
+
+            if ($result['success']) {
+                $importHistory->update([
+                    'success' => true
+                ]);
+
+                Log::info('Database import completed successfully', [
+                    'filename' => $filename,
+                    'user_id' => $user->id_user,
+                    'method' => $result['method']
+                ]);
+
+                return response()->json([
+                    'status' => 'success',
+                    'message' => 'Database berhasil diimport! (Method: ' . $result['method'] . ')'
+                ]);
+            } else {
+                throw new \Exception($result['error']);
+            }
+
+        } catch (\Exception $e) {
+            Log::error('Database import failed: ' . $e->getMessage());
+
+            if (isset($importHistory)) {
+                $importHistory->update([
+                    'success' => false,
+                    'error_message' => $e->getMessage()
+                ]);
+            }
+
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Import failed: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Import using command line mysql tool
+     */
+    private function importUsingCommandLine($filePath, $importHistory)
+    {
+        $database = config('database.connections.mysql.database');
+        $username = config('database.connections.mysql.username');
+        $password = config('database.connections.mysql.password');
+        $host = config('database.connections.mysql.host');
+
+        // Try to find mysql executable in common paths
+        $mysqlPaths = [
+            'mysql', // If it's in PATH
+            'C:\Program Files\MySQL\MySQL Server 8.0\bin\mysql.exe',
+            'C:\Program Files\MySQL\MySQL Server 5.7\bin\mysql.exe',
+            'C:\xampp\mysql\bin\mysql.exe',
+            'C:\wamp\bin\mysql\mysql8.0.xx\bin\mysql.exe',
+            'C:\wamp64\bin\mysql\mysql8.0.xx\bin\mysql.exe',
+        ];
+
+        $mysqlCommand = null;
+        foreach ($mysqlPaths as $path) {
+            if ($this->commandExists($path)) {
+                $mysqlCommand = $path;
+                break;
+            }
+        }
+
+        if (!$mysqlCommand) {
+            throw new \Exception('MySQL client not found. Please install MySQL command line tools.');
+        }
+
+        // Windows command
+        $command = "\"{$mysqlCommand}\" --user={$username} --password={$password} --host={$host} {$database} < \"{$filePath}\"";
+
+        // Execute import command
+        $process = Process::fromShellCommandline($command);
+        $process->setTimeout(300); // 5 minutes timeout
+        $process->run();
+
+        // Check if process was successful
+        if (!$process->isSuccessful()) {
+            throw new \Exception($process->getErrorOutput());
+        }
+
+        return ['success' => true, 'method' => 'command_line'];
+    }
+
+    /**
+     * Import using pure PHP (fallback method)
+     */
+    private function importUsingPhp($filePath, $importHistory)
+    {
+        Log::info('Starting PHP-based SQL import');
+        
+        // Read SQL file
+        $sqlContent = file_get_contents($filePath);
+        
+        if (empty($sqlContent)) {
+            throw new \Exception('SQL file is empty');
+        }
+
+        // Remove UTF-8 BOM if present
+        $sqlContent = preg_replace('/^\xEF\xBB\xBF/', '', $sqlContent);
+
+        // Split into individual queries
+        $queries = $this->splitSqlQueries($sqlContent);
+        
+        $successfulQueries = 0;
+        $totalQueries = count($queries);
+        $errors = [];
+        
+        Log::info("Found {$totalQueries} queries to execute");
+
+        // Disable foreign key checks temporarily
+        DB::statement('SET FOREIGN_KEY_CHECKS=0;');
+        
+        // Don't use transactions for entire import because DDL statements (CREATE, DROP, ALTER)
+        // cause implicit commits in MySQL and break transactions
+
+        try {
+            foreach ($queries as $index => $query) {
+                $query = trim($query);
+                
+                // Skip empty queries and comments
+                if (empty($query) || 
+                    strpos($query, '--') === 0 || 
+                    strpos($query, '/*') === 0 ||
+                    strpos($query, '#') === 0) {
+                    continue;
+                }
+
+                try {
+                    // Execute query without transaction
+                    DB::statement($query);
+                    $successfulQueries++;
+                    
+                    // Log progress for large files
+                    if ($index % 50 === 0) {
+                        Log::info("Import progress: {$successfulQueries}/{$totalQueries} queries");
+                    }
+                    
+                } catch (\Exception $e) {
+                    $errorMessage = $e->getMessage();
+                    Log::warning("Query failed [{$index}]: " . $errorMessage . " | Query: " . substr($query, 0, 200));
+                    
+                    // Classify errors - continue for some, stop for others
+                    if ($this->isNonCriticalError($errorMessage)) {
+                        // Non-critical error, continue with next query
+                        $errors[] = "Query {$index}: " . $errorMessage;
+                        continue;
+                    } else {
+                        // Critical error, stop import
+                        throw new \Exception("Critical error at query {$index}: " . $errorMessage);
+                    }
+                }
+            }
+            
+            // Re-enable foreign key checks
+            DB::statement('SET FOREIGN_KEY_CHECKS=1;');
+            
+            Log::info("PHP import completed: {$successfulQueries}/{$totalQueries} queries successful");
+            
+            $result = [
+                'success' => true, 
+                'method' => 'php',
+                'stats' => [
+                    'successful' => $successfulQueries,
+                    'total' => $totalQueries,
+                    'errors' => $errors
+                ]
+            ];
+            
+            if (!empty($errors)) {
+                $result['warning'] = 'Import completed with ' . count($errors) . ' non-critical errors';
+            }
+            
+            return $result;
+            
+        } catch (\Exception $e) {
+            // Re-enable foreign key checks on failure
+            DB::statement('SET FOREIGN_KEY_CHECKS=1;');
+            
+            $errorMsg = "PHP import failed at query {$successfulQueries}: " . $e->getMessage();
+            if (!empty($errors)) {
+                $errorMsg .= " (Plus " . count($errors) . " non-critical errors)";
+            }
+            
+            throw new \Exception($errorMsg);
+        }
+    }
+
+    private function isNonCriticalError($errorMessage)
+    {
+        $nonCriticalPatterns = [
+            '/table.*already exists/i',
+            '/table.*doesn\'t exist/i',
+            '/unknown table/i',
+            '/duplicate entry/i',
+            '/base table or view not found/i',
+            '/cannot add foreign key constraint/i',
+            '/key constraint fails/i',
+            '/integrity constraint violation/i'
+        ];
+        
+        foreach ($nonCriticalPatterns as $pattern) {
+            if (preg_match($pattern, $errorMessage)) {
+                return true;
+            }
+        }
+        
+        return false;
+    }
+
+    /**
+     * Split SQL file into individual queries
+     */
+    private function splitSqlQueries($sql)
+    {
+        // Remove MySQL comments
+        $sql = preg_replace('/\/\*.*?\*\//s', '', $sql);
+        $sql = preg_replace('/--.*?[\r\n]/', '', $sql);
+        $sql = preg_replace('/#.*?[\r\n]/', '', $sql);
+        
+        // Split by semicolon, but respect semicolons in strings and delimited identifiers
+        $queries = [];
+        $currentQuery = '';
+        $inString = false;
+        $inBacktick = false;
+        $stringChar = '';
+        $escapeNext = false;
+        
+        for ($i = 0; $i < strlen($sql); $i++) {
+            $char = $sql[$i];
+            
+            if ($escapeNext) {
+                $currentQuery .= $char;
+                $escapeNext = false;
+                continue;
+            }
+            
+            if ($char === '\\') {
+                $escapeNext = true;
+                $currentQuery .= $char;
+                continue;
+            }
+            
+            // Handle backticks for identifiers
+            if ($char === '`' && !$inString) {
+                $inBacktick = !$inBacktick;
+                $currentQuery .= $char;
+                continue;
+            }
+            
+            // Handle strings
+            if (($char === "'" || $char === '"') && !$inBacktick && !$inString) {
+                $inString = true;
+                $stringChar = $char;
+                $currentQuery .= $char;
+            } elseif ($char === $stringChar && $inString && !$inBacktick) {
+                $inString = false;
+                $stringChar = '';
+                $currentQuery .= $char;
+            } elseif ($char === ';' && !$inString && !$inBacktick) {
+                $query = trim($currentQuery);
+                if (!empty($query)) {
+                    $queries[] = $query;
+                }
+                $currentQuery = '';
+            } else {
+                $currentQuery .= $char;
+            }
+        }
+        
+        // Add the last query if any
+        $lastQuery = trim($currentQuery);
+        if (!empty($lastQuery)) {
+            $queries[] = $lastQuery;
+        }
+        
+        return array_filter($queries, function($query) {
+            // Filter out empty queries and common non-query patterns
+            return !empty(trim($query)) && 
+                   !preg_match('/^\s*(SET|USE|DELIMITER|--|#|\/\*)/i', $query);
+        });
+    }
+
+    /**
+     * Check if a command exists
+     */
+    private function commandExists($command)
+    {
+        if (strtoupper(substr(PHP_OS, 0, 3)) === 'WIN') {
+            $command = "where \"{$command}\" >nul 2>nul";
+        } else {
+            $command = "command -v {$command} >/dev/null 2>&1";
+        }
+        
+        $process = Process::fromShellCommandline($command);
+        $process->run();
+        
+        return $process->isSuccessful();
+    }
+
+    /**
      * Fallback method to generate SQL manually if mysqldump fails
      */
     private function createManualSqlBackup(Request $request, BackupHistory $backupHistory)
